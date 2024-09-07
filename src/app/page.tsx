@@ -1,14 +1,14 @@
 import { HydrateClient } from "~/trpc/server";
-import { ClientGreeting } from "./client-greeting";
+import VideoAdderForm from "./VideoAdderForm";
 
 export default function Home() {
   return (
     <HydrateClient>
       <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
         <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-          <section>Hello world</section>
+          <h2>Videos</h2>
           <section>
-            <ClientGreeting />
+            <VideoAdderForm />
           </section>
         </main>
       </div>

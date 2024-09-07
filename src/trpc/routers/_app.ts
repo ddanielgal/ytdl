@@ -2,15 +2,15 @@ import { z } from "zod";
 import { baseProcedure, createTRPCRouter } from "../init";
 
 export const appRouter = createTRPCRouter({
-  hello: baseProcedure
+  addVideo: baseProcedure
     .input(
       z.object({
-        text: z.string(),
+        url: z.string(),
       })
     )
-    .query((opts) => {
+    .mutation((opts) => {
       return {
-        greeting: `hello ${opts.input.text}`,
+        message: `added ${opts.input.url}`,
       };
     }),
 });

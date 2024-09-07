@@ -2,8 +2,11 @@ import { z } from "zod";
 import { baseProcedure, createTRPCRouter } from "../init";
 import YTDlpWrap from "yt-dlp-wrap-plus";
 import fs from "node:fs";
+import EventEmitter, { on } from "node:events";
 
 const yt = new YTDlpWrap("/home/linuxbrew/.linuxbrew/bin/yt-dlp");
+
+const progressEmitter = new EventEmitter();
 
 export const appRouter = createTRPCRouter({
   addVideo: baseProcedure
@@ -21,14 +24,15 @@ export const appRouter = createTRPCRouter({
         "data/%(uploader)s/%(title)s [%(id)s]/%(title)s [%(id)s].%(ext)s",
         opts.input.url,
       ])
-        .on("progress", (progress) =>
+        .on("progress", (progress) => {
           console.log(
             progress.percent,
             progress.totalSize,
             progress.currentSpeed,
             progress.eta
-          )
-        )
+          );
+          progressEmitter.emit("progress", { url: opts.input.url, progress });
+        })
         .on("ytDlpEvent", (eventType, eventData) =>
           console.log(eventType, eventData)
         )
@@ -49,6 +53,18 @@ export const appRouter = createTRPCRouter({
 
     return videos;
   }),
+  videoProgress: baseProcedure
+    .input(
+      z.object({
+        url: z.string(),
+      })
+    )
+    .subscription(async function* (opts) {
+      for await (const data of on(progressEmitter, "progress")) {
+        console.log({ data });
+        yield data;
+      }
+    }),
 });
 
 // export type definition of API

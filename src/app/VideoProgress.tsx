@@ -9,9 +9,9 @@ export default function VideoProgress({ url }: { url: string }) {
     { url },
     {
       onData: (data) => {
-        console.log({ data });
+        setProgress(data.percent);
       },
     }
   );
-  return null;
+  return progress;
 }

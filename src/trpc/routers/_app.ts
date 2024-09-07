@@ -31,7 +31,10 @@ export const appRouter = createTRPCRouter({
             progress.currentSpeed,
             progress.eta
           );
-          progressEmitter.emit("progress", { url: opts.input.url, progress });
+          progressEmitter.emit("progress", {
+            url: opts.input.url,
+            percent: progress.percent,
+          });
         })
         .on("ytDlpEvent", (eventType, eventData) =>
           console.log(eventType, eventData)
@@ -60,9 +63,13 @@ export const appRouter = createTRPCRouter({
       })
     )
     .subscription(async function* (opts) {
-      for await (const data of on(progressEmitter, "progress")) {
-        console.log({ data });
-        yield data;
+      for await (const [data] of on(progressEmitter, "progress")) {
+        if (data.url !== opts.input.url) {
+          continue;
+        }
+        const url: string = data.url;
+        const percent: number = data.percent;
+        yield { url, percent };
       }
     }),
 });

@@ -13,10 +13,11 @@ export const appRouter = createTRPCRouter({
     )
     .mutation((opts) => {
       yt.exec([
+        "-f bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
         "--write-info-json",
         "--write-thumbnail",
         "--output",
-        "%(uploader)s/%(title)s [%(id)s]/%(title)s [%(id)s].%(ext)s",
+        "data/%(uploader)s/%(title)s [%(id)s]/%(title)s [%(id)s].%(ext)s",
         opts.input.url,
       ])
         .on("progress", (progress) =>

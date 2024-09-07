@@ -3,7 +3,13 @@
 import { useState } from "react";
 import { trpc } from "~/trpc/client";
 
-export default function VideoProgress({ url }: { url: string }) {
+export default function VideoProgress({
+  url,
+  onFinish,
+}: {
+  url: string;
+  onFinish: () => void;
+}) {
   const [progress, setProgress] = useState(0);
   trpc.videoProgress.useSubscription(
     { url },
@@ -13,5 +19,6 @@ export default function VideoProgress({ url }: { url: string }) {
       },
     }
   );
+  trpc.videoFinished.useSubscription({ url }, { onData: onFinish });
   return progress;
 }

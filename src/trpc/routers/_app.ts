@@ -40,7 +40,12 @@ export const appRouter = createTRPCRouter({
           console.log(eventType, eventData)
         )
         .on("error", (error) => console.error(error))
-        .on("close", () => console.log("all done"));
+        .on("close", () => {
+          console.log("all done");
+          progressEmitter.emit("finish", {
+            url: opts.input.url,
+          });
+        });
       return {
         message: `downloading ${opts.input.url}`,
       };
@@ -70,6 +75,22 @@ export const appRouter = createTRPCRouter({
         const url: string = data.url;
         const percent: number = data.percent;
         yield { url, percent };
+      }
+    }),
+
+  videoFinished: baseProcedure
+    .input(
+      z.object({
+        url: z.string(),
+      })
+    )
+    .subscription(async function* (opts) {
+      for await (const [data] of on(progressEmitter, "finish")) {
+        if (data.url !== opts.input.url) {
+          continue;
+        }
+        const url: string = data.url;
+        yield { url };
       }
     }),
 });

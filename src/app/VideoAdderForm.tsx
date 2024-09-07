@@ -33,7 +33,14 @@ export default function VideoAdderForm() {
       <button type="submit" disabled={isPending}>
         Add Video
       </button>
-      {subscription && <VideoProgress url={subscription} />}
+      {subscription && (
+        <VideoProgress
+          onFinish={() => {
+            setSubscription(null);
+          }}
+          url={subscription}
+        />
+      )}
     </form>
   );
 }

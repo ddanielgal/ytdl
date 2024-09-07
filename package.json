@@ -19,6 +19,7 @@
     "react-dom": "^18",
     "server-only": "^0.0.1",
     "superjson": "^2.2.1",
+    "yt-dlp-wrap-plus": "^2.3.20",
     "zod": "^3.23.8"
   },
   "devDependencies": {

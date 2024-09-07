@@ -1,5 +1,6 @@
 import { HydrateClient } from "~/trpc/server";
 import VideoAdderForm from "./VideoAdderForm";
+import VideoList from "./VideoList";
 
 export default function Home() {
   return (
@@ -10,6 +11,7 @@ export default function Home() {
           <section>
             <VideoAdderForm />
           </section>
+          <VideoList />
         </main>
       </div>
     </HydrateClient>

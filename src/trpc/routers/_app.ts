@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { baseProcedure, createTRPCRouter } from "../init";
 import YTDlpWrap from "yt-dlp-wrap-plus";
+import fs from "node:fs";
 
 const yt = new YTDlpWrap("/home/linuxbrew/.linuxbrew/bin/yt-dlp");
 
@@ -37,6 +38,17 @@ export const appRouter = createTRPCRouter({
         message: `downloading ${opts.input.url}`,
       };
     }),
+  listVideos: baseProcedure.query(async () => {
+    const folders = await fs.promises.readdir("data", {
+      withFileTypes: true,
+      recursive: true,
+    });
+    const videos = folders.filter(
+      (folder) => folder.isDirectory() && folder.parentPath !== "data"
+    );
+
+    return videos;
+  }),
 });
 
 // export type definition of API

@@ -14,17 +14,15 @@ const progressMap = new Map<string, { url: string; percent: number }>();
 const debouncer = debounce(
   () => {
     progressMap.forEach((progress) => {
-      console.log("forEach", { progress });
       progressEmitter.emit("progress", progress);
     });
     progressMap.clear();
   },
-  { maxWaitMs: 1000 }
+  { maxWaitMs: 500 }
 );
 
 function emitProgress(url: string, percent: number) {
   progressMap.set(url, { url, percent });
-  console.log("set", { url, percent });
   debouncer.call();
 }
 
@@ -48,15 +46,11 @@ export const appRouter = createTRPCRouter({
         opts.input.url,
       ])
         .on("progress", (progress) => {
-          console.log("progress", progress);
           emitProgress(opts.input.url, Number(progress.percent));
         })
-        .on("ytDlpEvent", (eventType, eventData) =>
-          console.log(eventType, eventData)
-        )
+        // .on("ytDlpEvent", (...args) => console.log("ytdlpevent", args))
         .on("error", (error) => console.error(error))
         .on("close", () => {
-          console.log("all done");
           progressEmitter.emit("finish", {
             url: opts.input.url,
           });

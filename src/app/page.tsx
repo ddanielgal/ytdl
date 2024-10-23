@@ -14,7 +14,6 @@ export default function Home() {
           <section>
             <ProgressList />
           </section>
-          <VideoList />
         </main>
       </div>
     </HydrateClient>

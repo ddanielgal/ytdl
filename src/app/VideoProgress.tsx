@@ -2,12 +2,7 @@
 
 import { trpc } from "~/trpc/client";
 import { removeVideo, setProgress } from "./actions";
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "~/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { useVideo } from "./VideoContext";
 import { Progress } from "~/components/ui/progress";
 
@@ -33,10 +28,15 @@ export default function VideoProgress() {
     <Card>
       <CardHeader>
         <CardTitle>{title}</CardTitle>
-        <CardDescription>
-          <Progress value={progress} />
-        </CardDescription>
       </CardHeader>
+      <CardContent>
+        <div className="flex gap-4 items-center">
+          <Progress value={progress} />
+          <span className="w-12 flex justify-center">
+            {progress.toFixed(0)}%
+          </span>
+        </div>
+      </CardContent>
     </Card>
   );
 }

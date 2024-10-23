@@ -7,9 +7,13 @@ import VideoProgress from "./VideoProgress";
 export default function ProgressList() {
   const videos = useStore((s) => s.videosDownloading);
 
-  return videos.map(({ url }) => (
-    <VideoContext key={url} url={url}>
-      <VideoProgress />
-    </VideoContext>
-  ));
+  return (
+    <ul className="flex flex-col gap-4">
+      {videos.map(({ url }) => (
+        <VideoContext key={url} url={url}>
+          <VideoProgress />
+        </VideoContext>
+      ))}
+    </ul>
+  );
 }

@@ -16,7 +16,7 @@ export default function VideoAdderForm() {
   });
   return (
     <form
-      className="flex gap-4"
+      className="w-full flex gap-4"
       onSubmit={(event) => {
         if (isPending) {
           return;

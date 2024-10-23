@@ -23,6 +23,7 @@
     "next": "^14.2.16",
     "react": "^18",
     "react-dom": "^18",
+    "remeda": "^2.16.0",
     "server-only": "^0.0.1",
     "superjson": "^2.2.1",
     "tailwind-merge": "^2.5.4",

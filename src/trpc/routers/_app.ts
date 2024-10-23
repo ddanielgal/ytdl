@@ -3,10 +3,30 @@ import { baseProcedure, createTRPCRouter } from "../init";
 import YTDlpWrap from "yt-dlp-wrap-plus";
 import fs from "node:fs";
 import EventEmitter, { on } from "node:events";
+import { debounce } from "remeda";
 
 const yt = new YTDlpWrap("/home/linuxbrew/.linuxbrew/bin/yt-dlp");
 
 const progressEmitter = new EventEmitter();
+
+const progressMap = new Map<string, { url: string; percent: number }>();
+
+const debouncer = debounce(
+  () => {
+    progressMap.forEach((progress) => {
+      console.log("forEach", { progress });
+      progressEmitter.emit("progress", progress);
+    });
+    progressMap.clear();
+  },
+  { maxWaitMs: 1000 }
+);
+
+function emitProgress(url: string, percent: number) {
+  progressMap.set(url, { url, percent });
+  console.log("set", { url, percent });
+  debouncer.call();
+}
 
 export const appRouter = createTRPCRouter({
   addVideo: baseProcedure
@@ -28,16 +48,8 @@ export const appRouter = createTRPCRouter({
         opts.input.url,
       ])
         .on("progress", (progress) => {
-          console.log(
-            progress.percent,
-            progress.totalSize,
-            progress.currentSpeed,
-            progress.eta
-          );
-          progressEmitter.emit("progress", {
-            url: opts.input.url,
-            percent: progress.percent,
-          });
+          console.log("progress", progress);
+          emitProgress(opts.input.url, Number(progress.percent));
         })
         .on("ytDlpEvent", (eventType, eventData) =>
           console.log(eventType, eventData)

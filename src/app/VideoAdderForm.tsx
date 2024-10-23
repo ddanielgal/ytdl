@@ -2,15 +2,15 @@
 
 import { useState } from "react";
 import { trpc } from "~/trpc/client";
-import VideoProgress from "./VideoProgress";
+import { addVideo as addDownloadingVideo } from "./actions";
+import { Input } from "~/components/ui/input";
+import { Button } from "~/components/ui/button";
 
 export default function VideoAdderForm() {
   const [url, setUrl] = useState("");
-  const [subscription, setSubscription] = useState<string | null>(null);
   const { mutate: addVideo, isPending } = trpc.addVideo.useMutation({
-    onSuccess: () => {
-      setSubscription(url);
-      setUrl("");
+    onSuccess: ({ metadata }) => {
+      addDownloadingVideo({ url, title: metadata.title, progress: 0 });
     },
   });
   return (
@@ -24,23 +24,15 @@ export default function VideoAdderForm() {
         addVideo({ url });
       }}
     >
-      <input
+      <Input
         type="text"
         value={url}
         onChange={(event) => setUrl(event.target.value)}
         disabled={isPending}
       />
-      <button type="submit" disabled={isPending}>
+      <Button type="submit" disabled={isPending}>
         Add Video
-      </button>
-      {subscription && (
-        <VideoProgress
-          onFinish={() => {
-            setSubscription(null);
-          }}
-          url={subscription}
-        />
-      )}
+      </Button>
     </form>
   );
 }

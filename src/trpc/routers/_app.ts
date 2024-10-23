@@ -15,7 +15,10 @@ export const appRouter = createTRPCRouter({
         url: z.string(),
       })
     )
-    .mutation((opts) => {
+    .mutation(async (opts) => {
+      const rawMetadata = await yt.getVideoInfo(opts.input.url);
+      const metadata = z.object({ title: z.string() }).parse(rawMetadata);
+
       yt.exec([
         "-f bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
         "--write-info-json",
@@ -47,7 +50,7 @@ export const appRouter = createTRPCRouter({
           });
         });
       return {
-        message: `downloading ${opts.input.url}`,
+        metadata,
       };
     }),
   listVideos: baseProcedure.query(async () => {

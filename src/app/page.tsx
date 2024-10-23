@@ -1,15 +1,18 @@
 import { HydrateClient } from "~/trpc/server";
 import VideoAdderForm from "./VideoAdderForm";
 import VideoList from "./VideoList";
+import ProgressList from "./ProgressList";
 
 export default function Home() {
   return (
     <HydrateClient>
-      <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-        <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-          <h2>Videos</h2>
+      <div className="flex h-screen w-screen flex-col items-center p-8">
+        <main className="flex flex-col max-w-xl gap-8">
           <section>
             <VideoAdderForm />
+          </section>
+          <section>
+            <ProgressList />
           </section>
           <VideoList />
         </main>

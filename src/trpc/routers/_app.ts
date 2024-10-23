@@ -5,7 +5,7 @@ import fs from "node:fs";
 import EventEmitter, { on } from "node:events";
 import { debounce } from "remeda";
 
-const yt = new YTDlpWrap("/home/linuxbrew/.linuxbrew/bin/yt-dlp");
+const yt = new YTDlpWrap("/app/bin/yt-dlp");
 
 const progressEmitter = new EventEmitter();
 
@@ -42,7 +42,7 @@ export const appRouter = createTRPCRouter({
         "--write-info-json",
         "--write-thumbnail",
         "--output",
-        "data/%(uploader)s/%(upload_date>%Y)s/%(title)s/%(title)s.%(ext)s",
+        "data/videos/%(uploader)s/%(upload_date>%Y)s/%(title)s/%(title)s.%(ext)s",
         opts.input.url,
       ])
         .on("progress", (progress) => {

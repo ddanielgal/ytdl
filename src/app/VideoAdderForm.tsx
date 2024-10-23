@@ -11,6 +11,7 @@ export default function VideoAdderForm() {
   const { mutate: addVideo, isPending } = trpc.addVideo.useMutation({
     onSuccess: ({ metadata }) => {
       addDownloadingVideo({ url, title: metadata.title, progress: 0 });
+      setUrl("");
     },
   });
   return (

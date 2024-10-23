@@ -21,7 +21,7 @@ export const appRouter = createTRPCRouter({
         "--write-info-json",
         "--write-thumbnail",
         "--output",
-        "data/%(uploader)s/%(title)s [%(id)s]/%(title)s [%(id)s].%(ext)s",
+        "data/%(uploader)s/%(upload_date>%Y)s/%(title)s [%(id)s]/%(title)s [%(id)s].%(ext)s",
         opts.input.url,
       ])
         .on("progress", (progress) => {

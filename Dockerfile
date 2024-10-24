@@ -25,6 +25,8 @@ COPY .next/ ./.next/
 COPY next.config.mjs ./next.config.mjs
 COPY package.json ./package.json
 
+RUN apt-get update && apt-get install -y ffmpeg
+
 # Set the NODE_ENV environment variable to production
 ENV NODE_ENV production
 

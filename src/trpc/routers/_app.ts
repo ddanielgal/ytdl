@@ -38,7 +38,8 @@ export const appRouter = createTRPCRouter({
       const metadata = z.object({ title: z.string() }).parse(rawMetadata);
 
       yt.exec([
-        "-f bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+        "-f",
+        "bv*[height<=1080]+ba/b",
         "--write-info-json",
         "--write-thumbnail",
         "--output",

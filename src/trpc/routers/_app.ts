@@ -42,8 +42,12 @@ export const appRouter = createTRPCRouter({
         "bv*[height<=1080]+ba/b",
         "--write-info-json",
         "--write-thumbnail",
+        "--write-subs",
+        "--write-auto-subs",
+        " --sub-langs en,en-orig,hu,hu-orig",
+        "--convert-subs srt",
         "--output",
-        "data/videos/%(uploader)s/%(upload_date>%Y)s/%(title)s/%(title)s.%(ext)s",
+        "data/videos/%(uploader)s/%(upload_date>%Y)s/%(upload_date)s %(title)s/%(title)s.%(ext)s",
         opts.input.url,
       ])
         .on("progress", (progress) => {

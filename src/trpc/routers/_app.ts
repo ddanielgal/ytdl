@@ -4,8 +4,9 @@ import YTDlpWrap from "yt-dlp-wrap-plus";
 import fs from "node:fs";
 import EventEmitter, { on } from "node:events";
 import { debounce } from "remeda";
+import env from "~/env";
 
-const yt = new YTDlpWrap("/app/bin/yt-dlp");
+const yt = new YTDlpWrap(env.YTDLP_PATH);
 
 const progressEmitter = new EventEmitter();
 

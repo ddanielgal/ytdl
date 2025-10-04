@@ -14,7 +14,7 @@ import { Progress } from "~/components/ui/progress";
 import { Badge } from "~/components/ui/badge";
 
 export default function VideoProgress() {
-  const { id, url, title, progress, status, error } = useVideo();
+  const { id, url, title, progress, status, error, steps } = useVideo();
 
   // Subscribe to real-time progress updates
   trpc.jobProgress.useSubscription(
@@ -23,6 +23,10 @@ export default function VideoProgress() {
       onData: (data) => {
         setProgress(id, data.progress);
         updateVideoStatus(id, data.status, data.error);
+        // Update steps if provided
+        if (data.steps) {
+          // This would need to be implemented in actions.ts
+        }
       },
     }
   );
@@ -31,11 +35,9 @@ export default function VideoProgress() {
   trpc.jobFinished.useSubscription(
     { jobId: id },
     {
-      onData: () => {
-        // Remove completed jobs after a delay
-        setTimeout(() => {
-          removeVideo(id);
-        }, 3000);
+      onData: (data) => {
+        // Update status to completed/failed but keep in UI
+        updateVideoStatus(id, data.status, data.error);
       },
     }
   );
@@ -75,9 +77,26 @@ export default function VideoProgress() {
         <div className="flex gap-4 items-center">
           <Progress value={progress} className="flex-1" />
           <span className="w-12 flex justify-center text-sm font-medium">
-            {progress.toFixed(0)}%
+            {(progress || 0).toFixed(0)}%
           </span>
         </div>
+
+        {steps && (
+          <div className="mt-4 space-y-2">
+            <div className="text-sm font-medium text-gray-700">Download Steps:</div>
+            {Object.entries(steps).map(([stepName, step]) => (
+              <div key={stepName} className="flex items-center gap-2">
+                <div className="w-20 text-xs capitalize">{stepName}:</div>
+                <Progress value={step.progress} className="flex-1 h-2" />
+                <div className="w-8 text-xs text-center">
+                  {step.status === "completed" ? "✓" :
+                    step.status === "active" ? "⟳" :
+                      step.status === "failed" ? "✗" : "○"}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

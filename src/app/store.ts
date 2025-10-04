@@ -8,6 +8,12 @@ export type Video = {
   progress: number;
   status: "PENDING" | "ACTIVE" | "COMPLETED" | "FAILED" | "DELAYED" | "WAITING";
   error?: string;
+  steps?: {
+    info: { status: "pending" | "active" | "completed" | "failed"; progress: number };
+    download: { status: "pending" | "active" | "completed" | "failed"; progress: number };
+    remux: { status: "pending" | "active" | "completed" | "failed"; progress: number };
+    subtitles: { status: "pending" | "active" | "completed" | "failed"; progress: number };
+  };
 };
 
 type State = {

@@ -1,11 +1,9 @@
 import { Queue, Worker, Job } from "bullmq";
 import { Redis } from "ioredis";
 import YTDlpWrap from "yt-dlp-wrap-plus";
-import { db } from "./db";
+import { redisStore, JobData } from "./redis-store";
 import { progressEmitter } from "./events";
 import env from "~/env";
-import fs from "node:fs";
-import path from "node:path";
 
 // Redis connection
 const redis = new Redis(env.REDIS_URL, {
@@ -30,41 +28,55 @@ export const downloadQueue = new Queue("download", {
 // Job data interface
 export interface DownloadJobData {
     url: string;
-    title?: string;
-    dbJobId: string;
+    jobId: string;
 }
 
 // Worker for processing download jobs
 const worker = new Worker(
     "download",
     async (job: Job<DownloadJobData>) => {
-        const { url, title, dbJobId } = job.data;
+        const { url, jobId } = job.data;
+        console.log("Worker processing job:", job.id, "for URL:", url);
 
         try {
             // Update job status to ACTIVE
-            await db.downloadJob.update({
-                where: { id: dbJobId },
-                data: {
-                    status: "ACTIVE",
-                    bullJobId: job.id,
-                },
-            });
+            await redisStore.updateJob(jobId, { status: "ACTIVE" });
 
             // Initialize yt-dlp
             const yt = new YTDlpWrap(env.YTDLP_PATH);
 
             // Get video info first
+            console.log("Fetching video info for:", url);
             const metadata = await yt.getVideoInfo(url);
-            const videoTitle = metadata.title || title || "Unknown";
+            const videoTitle = metadata.title || "Unknown";
+            console.log("Video title:", videoTitle);
 
-            // Update title in database
-            await db.downloadJob.update({
-                where: { id: dbJobId },
-                data: { title: videoTitle },
+            // Update title and complete info step
+            await redisStore.updateJob(jobId, { title: videoTitle });
+            await redisStore.completeJobStep(jobId, "info");
+
+            // Emit initial progress event after title update
+            console.log("Emitting initial progress event after title update");
+            progressEmitter.emit("progress", {
+                jobId,
+                url,
+                title: videoTitle,
+                progress: 0,
+                status: "ACTIVE",
+                steps: {
+                    info: { status: "completed", progress: 100 },
+                    download: { status: "pending", progress: 0 },
+                    remux: { status: "pending", progress: 0 },
+                    subtitles: { status: "pending", progress: 0 },
+                },
             });
 
-            // Start download with progress tracking
+            // Start download with comprehensive event tracking
             const downloadPromise = new Promise<void>((resolve, reject) => {
+                let currentStep = "download";
+                let remuxProgress = 0;
+                let subtitleProgress = 0;
+
                 yt.exec([
                     "-f",
                     "bv*[height<=1080]+ba/b",
@@ -81,31 +93,58 @@ const worker = new Worker(
                     url,
                 ])
                     .on("progress", async (progress) => {
-                        const percent = Number(progress.percent);
+                        const percent = Number(progress.percent) || 0;
+                        console.log(`Progress [${currentStep}]:`, percent + "%", progress);
 
-                        // Update progress in database
-                        await db.downloadJob.update({
-                            where: { id: dbJobId },
-                            data: { progress: percent },
-                        });
-
-                        // Update job progress
-                        await job.updateProgress(percent);
+                        // Update progress for current step
+                        await redisStore.updateJobProgress(jobId, currentStep as keyof JobData["steps"], percent);
 
                         // Emit progress event for real-time updates
-                        progressEmitter.emit("progress", {
-                            jobId: dbJobId,
-                            url,
-                            title: videoTitle,
-                            progress: percent,
-                            status: "ACTIVE",
-                        });
+                        const jobData = await redisStore.getJob(jobId);
+                        if (jobData) {
+                            console.log("Emitting progress event:", {
+                                jobId,
+                                progress: jobData.progress,
+                                status: jobData.status,
+                                currentStep
+                            });
+                            progressEmitter.emit("progress", {
+                                jobId,
+                                url,
+                                title: jobData.title,
+                                progress: jobData.progress || 0,
+                                status: jobData.status,
+                                steps: jobData.steps,
+                            });
+                        }
+                    })
+                    .on("ytDlpEvent", (event) => {
+                        console.log("yt-dlp event:", event);
+
+                        // Detect step changes based on event string
+                        if (typeof event === "string") {
+                            const previousStep = currentStep;
+                            if (event === "info") {
+                                currentStep = "info";
+                            } else if (event === "download") {
+                                currentStep = "download";
+                            } else if (event === "SubtitlesConvertor") {
+                                currentStep = "subtitles";
+                            } else if (event === "Merger") {
+                                currentStep = "remux";
+                            }
+
+                            if (previousStep !== currentStep) {
+                                console.log(`Step changed: ${previousStep} → ${currentStep}`);
+                            }
+                        }
                     })
                     .on("error", (error) => {
                         console.error("yt-dlp error:", error);
                         reject(error);
                     })
                     .on("close", (code) => {
+                        console.log("yt-dlp process closed with code:", code);
                         if (code === 0) {
                             resolve();
                         } else {
@@ -116,49 +155,41 @@ const worker = new Worker(
 
             await downloadPromise;
 
-            // Mark job as completed
-            await db.downloadJob.update({
-                where: { id: dbJobId },
-                data: {
-                    status: "COMPLETED",
-                    progress: 100,
-                    completedAt: new Date(),
-                },
-            });
+            // Complete all remaining steps
+            await redisStore.completeJobStep(jobId, "download");
+            await redisStore.completeJobStep(jobId, "remux");
+            await redisStore.completeJobStep(jobId, "subtitles");
+            await redisStore.completeJob(jobId);
 
             // Emit completion event
-            progressEmitter.emit("finish", {
-                jobId: dbJobId,
-                url,
-                title: videoTitle,
-                status: "COMPLETED",
-            });
+            const jobData = await redisStore.getJob(jobId);
+            if (jobData) {
+                progressEmitter.emit("finish", {
+                    jobId,
+                    url,
+                    title: jobData.title,
+                    status: "COMPLETED",
+                    steps: jobData.steps,
+                });
+            }
 
         } catch (error) {
             console.error("Download job failed:", error);
 
-            // Get current job title from database
-            const job = await db.downloadJob.findUnique({
-                where: { id: dbJobId },
-                select: { title: true },
-            });
+            // Get current job data
+            const jobData = await redisStore.getJob(jobId);
 
             // Mark job as failed
-            await db.downloadJob.update({
-                where: { id: dbJobId },
-                data: {
-                    status: "FAILED",
-                    error: error instanceof Error ? error.message : "Unknown error",
-                },
-            });
+            await redisStore.failJob(jobId, error instanceof Error ? error.message : "Unknown error");
 
             // Emit failure event
             progressEmitter.emit("finish", {
-                jobId: dbJobId,
+                jobId,
                 url,
-                title: job?.title || "Unknown",
+                title: jobData?.title || "Unknown",
                 status: "FAILED",
                 error: error instanceof Error ? error.message : "Unknown error",
+                steps: jobData?.steps,
             });
 
             throw error;

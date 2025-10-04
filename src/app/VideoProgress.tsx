@@ -1,7 +1,7 @@
 "use client";
 
+import { useState } from "react";
 import { trpc } from "~/trpc/client";
-import { removeVideo, setProgress, updateVideoStatus } from "./actions";
 import {
   Card,
   CardContent,
@@ -9,24 +9,43 @@ import {
   CardHeader,
   CardTitle,
 } from "~/components/ui/card";
-import { useVideo } from "./VideoContext";
+// Remove VideoContext dependency
 import { Progress } from "~/components/ui/progress";
 import { Badge } from "~/components/ui/badge";
 
-export default function VideoProgress() {
-  const { id, url, title, progress, status, error, steps } = useVideo();
+interface VideoProgressProps {
+  id: string;
+  url: string;
+  title: string;
+  progress: number;
+  status: string;
+  error?: string;
+}
+
+export default function VideoProgress({ id, url, title, progress, status, error }: VideoProgressProps) {
+  const [logs, setLogs] = useState<string[]>([]);
+  const [currentProgress, setCurrentProgress] = useState(progress);
+  const [currentStatus, setCurrentStatus] = useState(status);
+  const [currentError, setCurrentError] = useState(error);
 
   // Subscribe to real-time progress updates
   trpc.jobProgress.useSubscription(
     { jobId: id },
     {
       onData: (data) => {
-        setProgress(id, data.progress);
-        updateVideoStatus(id, data.status, data.error);
-        // Update steps if provided
-        if (data.steps) {
-          // This would need to be implemented in actions.ts
-        }
+        setCurrentProgress(data.progress);
+        setCurrentStatus(data.status);
+        if (data.error) setCurrentError(data.error);
+      },
+    }
+  );
+
+  // Subscribe to real-time logs
+  trpc.jobLogs.useSubscription(
+    { jobId: id },
+    {
+      onData: (data) => {
+        setLogs(prev => [...prev, data.line]);
       },
     }
   );
@@ -37,7 +56,8 @@ export default function VideoProgress() {
     {
       onData: (data) => {
         // Update status to completed/failed but keep in UI
-        updateVideoStatus(id, data.status, data.error);
+        setCurrentStatus(data.status);
+        if (data.error) setCurrentError(data.error);
       },
     }
   );
@@ -62,39 +82,35 @@ export default function VideoProgress() {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="truncate">{title}</CardTitle>
-          <Badge className={getStatusColor(status)}>
-            {status}
+          <Badge className={getStatusColor(currentStatus)}>
+            {currentStatus}
           </Badge>
         </div>
         <CardDescription className="truncate">{url}</CardDescription>
-        {error && (
+        {currentError && (
           <CardDescription className="text-red-600">
-            Error: {error}
+            Error: {currentError}
           </CardDescription>
         )}
       </CardHeader>
       <CardContent>
         <div className="flex gap-4 items-center">
-          <Progress value={progress} className="flex-1" />
+          <Progress value={currentProgress} className="flex-1" />
           <span className="w-12 flex justify-center text-sm font-medium">
-            {(progress || 0).toFixed(0)}%
+            {(currentProgress || 0).toFixed(0)}%
           </span>
         </div>
 
-        {steps && (
+        {logs.length > 0 && (
           <div className="mt-4 space-y-2">
-            <div className="text-sm font-medium text-gray-700">Download Steps:</div>
-            {Object.entries(steps).map(([stepName, step]) => (
-              <div key={stepName} className="flex items-center gap-2">
-                <div className="w-20 text-xs capitalize">{stepName}:</div>
-                <Progress value={step.progress} className="flex-1 h-2" />
-                <div className="w-8 text-xs text-center">
-                  {step.status === "completed" ? "✓" :
-                    step.status === "active" ? "⟳" :
-                      step.status === "failed" ? "✗" : "○"}
+            <div className="text-sm font-medium text-gray-700">yt-dlp Output:</div>
+            <div className="bg-gray-100 p-3 rounded text-xs font-mono max-h-32 overflow-y-auto">
+              {logs.map((log, index) => (
+                <div key={index} className="text-gray-700">
+                  {log}
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
       </CardContent>

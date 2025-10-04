@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { trpc } from "~/trpc/client";
-import { addVideo as addDownloadingVideo } from "./actions";
 import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
 
@@ -10,13 +9,7 @@ export default function VideoAdderForm() {
   const [url, setUrl] = useState("");
   const { mutate: addVideo, isPending } = trpc.addVideo.useMutation({
     onSuccess: ({ metadata, jobId }) => {
-      addDownloadingVideo({
-        id: jobId,
-        url,
-        title: metadata.title,
-        progress: 0,
-        status: "PENDING"
-      });
+      // Video will be automatically added to the list via the getActiveJobs query
       setUrl("");
     },
   });

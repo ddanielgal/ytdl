@@ -1,33 +1,33 @@
 "use client";
 
-import { useEffect } from "react";
-import useStore from "./store";
-import { VideoContext } from "./VideoContext";
+import { useEffect, useState } from "react";
 import VideoProgress from "./VideoProgress";
 import { trpc } from "~/trpc/client";
-import { loadActiveJobs } from "./actions";
 
 export default function ProgressList() {
-  const videos = useStore((s) => s.videosDownloading);
+  const [videos, setVideos] = useState<any[]>([]);
 
   // Load active jobs on mount for persistence
   const { data: activeJobs } = trpc.getActiveJobs.useQuery();
 
   useEffect(() => {
     if (activeJobs) {
-      // Only load active jobs, don't overwrite completed ones in local state
-      const currentVideos = useStore.getState().videosDownloading;
-      const completedJobs = currentVideos.filter(v => v.status === "COMPLETED" || v.status === "FAILED");
-      loadActiveJobs([...activeJobs, ...completedJobs]);
+      setVideos(activeJobs);
     }
   }, [activeJobs]);
 
   return (
     <ul className="flex flex-col gap-4">
-      {videos.map(({ id }) => (
-        <VideoContext key={id} jobId={id}>
-          <VideoProgress />
-        </VideoContext>
+      {videos.map((video) => (
+        <VideoProgress
+          key={video.id}
+          id={video.id}
+          url={video.url}
+          title={video.title}
+          progress={video.progress}
+          status={video.status}
+          error={video.error}
+        />
       ))}
     </ul>
   );

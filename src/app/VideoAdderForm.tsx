@@ -9,8 +9,14 @@ import { Button } from "~/components/ui/button";
 export default function VideoAdderForm() {
   const [url, setUrl] = useState("");
   const { mutate: addVideo, isPending } = trpc.addVideo.useMutation({
-    onSuccess: ({ metadata }) => {
-      addDownloadingVideo({ url, title: metadata.title, progress: 0 });
+    onSuccess: ({ metadata, jobId }) => {
+      addDownloadingVideo({
+        id: jobId,
+        url,
+        title: metadata.title,
+        progress: 0,
+        status: "PENDING"
+      });
       setUrl("");
     },
   });
@@ -30,6 +36,7 @@ export default function VideoAdderForm() {
         value={url}
         onChange={(event) => setUrl(event.target.value)}
         disabled={isPending}
+        placeholder="Enter YouTube URL..."
       />
       <Button type="submit" disabled={isPending}>
         Add Video

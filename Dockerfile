@@ -1,37 +1,36 @@
-# Stage 1: Install production dependencies
-FROM node:20 AS dependencies
+FROM node:18-alpine
 
+# Install system dependencies
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    ffmpeg \
+    wget \
+    ca-certificates
+
+# Install yt-dlp
+RUN pip3 install yt-dlp
+
+# Set working directory
 WORKDIR /app
 
-RUN mkdir -p /app/bin
-RUN wget https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -O /app/bin/yt-dlp
-RUN chmod a+rx /app/bin/yt-dlp
+# Copy package files
+COPY package*.json ./
 
-# Copy only the package.json and package-lock.json
-COPY package.json package-lock.json ./
-
-# Install only production dependencies
+# Install dependencies
 RUN npm ci --only=production
 
-# Stage 2: Build the runtime image
-FROM node:20 AS runner
+# Copy source code
+COPY . .
 
-WORKDIR /app
+# Generate Prisma client
+RUN npx prisma generate
 
-# Copy the built application and production dependencies
-COPY --from=dependencies /app/node_modules ./node_modules
-COPY --from=dependencies /app/bin/yt-dlp ./bin/yt-dlp
-COPY .next/ ./.next/
-COPY next.config.mjs ./next.config.mjs
-COPY package.json ./package.json
+# Create data directory
+RUN mkdir -p /app/data
 
-RUN apt-get update && apt-get install -y ffmpeg
-
-# Set the NODE_ENV environment variable to production
-ENV NODE_ENV production
-
-# Expose the port the app runs on
+# Expose port
 EXPOSE 3000
 
-# Start the Next.js application
+# Start the application
 CMD ["npm", "start"]

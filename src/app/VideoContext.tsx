@@ -12,13 +12,13 @@ export const useVideo = () => {
 };
 
 export function VideoContext({
-  url,
+  jobId,
   children,
 }: {
-  url: string;
+  jobId: string;
   children: ReactNode;
 }) {
-  const video = useStore((s) => s.videosDownloading.find((v) => v.url === url));
+  const video = useStore((s) => s.videosDownloading.find((v) => v.id === jobId));
   if (!video) {
     return null;
   }

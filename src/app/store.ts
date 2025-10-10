@@ -4,7 +4,7 @@ import { immer } from "zustand/middleware/immer";
 export type Video = {
   url: string;
   title: string;
-  progress: number;
+  messages: string[];
 };
 
 type State = {

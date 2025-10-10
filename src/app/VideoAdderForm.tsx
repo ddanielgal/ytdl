@@ -10,7 +10,11 @@ export default function VideoAdderForm() {
   const [url, setUrl] = useState("");
   const { mutate: addVideo, isPending } = trpc.addVideo.useMutation({
     onSuccess: ({ metadata }) => {
-      addDownloadingVideo({ url, title: metadata.title, progress: 0 });
+      addDownloadingVideo({
+        url,
+        title: metadata.title,
+        messages: []
+      });
       setUrl("");
     },
   });

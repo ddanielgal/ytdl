@@ -8,24 +8,19 @@ export function addVideo(video: Video) {
   });
 }
 
-export function removeVideo(url: string) {
-  set((state) => {
-    const index = state.videosDownloading.findIndex(
-      (video) => video.url === url
-    );
-    if (index === -1) {
-      return;
-    }
-    state.videosDownloading.splice(index, 1);
-  });
-}
-
-export function setProgress(url: string, progress: number) {
+export function addMessage(url: string, message: string) {
   set((state) => {
     const video = state.videosDownloading.find((v) => v.url === url);
     if (!video) {
       return;
     }
-    video.progress = progress;
+
+    // Add new message to the beginning of the array
+    video.messages.unshift(message);
+
+    // Keep only the latest 5 messages
+    if (video.messages.length > 5) {
+      video.messages = video.messages.slice(0, 5);
+    }
   });
 }

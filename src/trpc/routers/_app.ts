@@ -107,12 +107,9 @@ export const appRouter = createTRPCRouter({
 
         return () => {
           globalEmitter.off(url, handleProgress);
-
         };
       });
     }),
-
-
 });
 
 // export type definition of API

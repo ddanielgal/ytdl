@@ -15,12 +15,6 @@ export function addMessage(url: string, message: string) {
       return;
     }
 
-    // Add new message to the beginning of the array
     video.messages.unshift(message);
-
-    // Keep only the latest 5 messages
-    if (video.messages.length > 5) {
-      video.messages = video.messages.slice(0, 5);
-    }
   });
 }

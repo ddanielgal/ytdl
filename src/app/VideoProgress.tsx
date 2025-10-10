@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { trpc } from "~/trpc/client";
 import { addMessage } from "./actions";
 import {
@@ -9,23 +10,23 @@ import {
   CardHeader,
   CardTitle,
 } from "~/components/ui/card";
+import { Button } from "~/components/ui/button";
 import { useVideo } from "./VideoContext";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 export default function VideoProgress() {
   const { url, title, messages } = useVideo();
+  const [isExpanded, setIsExpanded] = useState(false);
 
-  // Subscribe to video progress messages
   trpc.videoProgress.useSubscription(
     { url },
     {
       onData: (data) => {
-        // Convert the data to a string message
-        const message = typeof data === 'string' ? data : JSON.stringify(data);
+        const message = typeof data === "string" ? data : JSON.stringify(data);
         addMessage(url, message);
       },
     }
   );
-
 
   return (
     <Card>
@@ -39,21 +40,31 @@ export default function VideoProgress() {
       </CardHeader>
       <CardContent>
         <div className="space-y-2">
-          <h4 className="text-sm font-medium">Latest Messages:</h4>
-          {messages.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No messages yet...</p>
-          ) : (
-            <div className="space-y-1">
-              {messages.map((message, index) => (
-                <div
-                  key={index}
-                  className="text-xs p-2 bg-muted rounded border-l-2 border-blue-500"
-                >
-                  {message}
-                </div>
-              ))}
+          {messages.length > 0 ? (
+            <div className="border rounded-md bg-muted/50 relative">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="absolute top-2 right-2 z-10 flex items-center gap-1"
+              >
+                {isExpanded ? (
+                  <>
+                    <ChevronUp className="h-4 w-4" />
+                    Collapse
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-4 w-4" />
+                    Expand
+                  </>
+                )}
+              </Button>
+              <pre className="text-xs p-3 overflow-x-auto whitespace-pre-wrap font-mono">
+                {(isExpanded ? messages : messages.slice(0, 5)).join("\n")}
+              </pre>
             </div>
-          )}
+          ) : null}
         </div>
       </CardContent>
     </Card>

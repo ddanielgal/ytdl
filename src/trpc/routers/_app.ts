@@ -34,6 +34,8 @@ export const appRouter = createTRPCRouter({
       const rawMetadata = await yt.getVideoInfo(url);
       const metadata = z.object({ title: z.string() }).parse(rawMetadata);
 
+      console.log("start", url);
+
       const downloadEmitter = yt.exec([
         "-f",
         "bv*[height<=1080]+ba/b",
@@ -45,6 +47,7 @@ export const appRouter = createTRPCRouter({
         "en,en-orig,hu,hu-orig",
         "--convert-subs",
         "srt",
+        "--ignore-errors",
         "--output",
         "data/videos/%(uploader)s/%(upload_date>%Y)s/%(upload_date)s %(title)s/%(title)s.%(ext)s",
         url,
@@ -59,6 +62,7 @@ export const appRouter = createTRPCRouter({
       }
 
       function handleError(...args: unknown[]) {
+        console.error(url, args);
         globalEmitter.emit(url, ...args);
         downloadEmitter.off("progress", handleProgress);
         downloadEmitter.off("ytDlpEvent", handleYtdlpEvent);
@@ -67,6 +71,7 @@ export const appRouter = createTRPCRouter({
       }
 
       function handleClose() {
+        console.info("close", url);
         globalEmitter.emit(url, "finish");
         downloadEmitter.off("progress", handleProgress);
         downloadEmitter.off("ytDlpEvent", handleYtdlpEvent);
@@ -100,9 +105,11 @@ export const appRouter = createTRPCRouter({
         }
 
         globalEmitter.on(url, handleAllEvents);
+        console.info("on", url);
 
         return () => {
           globalEmitter.off(url, handleAllEvents);
+          console.info("off", url);
         };
       });
     }),

@@ -15,10 +15,7 @@ export default function ProgressList() {
 
   useEffect(() => {
     if (activeJobs) {
-      // Only load active jobs, don't overwrite completed ones in local state
-      const currentVideos = useStore.getState().videosDownloading;
-      const completedJobs = currentVideos.filter(v => v.status === "COMPLETED" || v.status === "FAILED");
-      loadActiveJobs([...activeJobs, ...completedJobs]);
+      loadActiveJobs(activeJobs);
     }
   }, [activeJobs]);
 

@@ -61,7 +61,7 @@ export default function VideoProgress() {
                 )}
               </Button>
               <pre className="text-xs p-3 overflow-x-auto whitespace-pre-wrap font-mono">
-                {(isExpanded ? messages : messages.slice(0, 5)).join("\n")}
+                {(isExpanded ? messages : messages.slice(-5)).join("\n")}
               </pre>
             </div>
           ) : null}

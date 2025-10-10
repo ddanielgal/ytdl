@@ -15,6 +15,6 @@ export function addMessage(url: string, message: string) {
       return;
     }
 
-    video.messages.unshift(message);
+    video.messages.push(message);
   });
 }

@@ -2,14 +2,13 @@ import { z } from "zod";
 import { baseProcedure, createTRPCRouter } from "../init";
 import YTDlpWrap from "yt-dlp-wrap-plus";
 import fs from "node:fs";
-import EventEmitter, { on } from "node:events";
+import EventEmitter from "node:events";
 import env from "~/env";
 import { observable } from "@trpc/server/observable";
 
 const yt = new YTDlpWrap(env.YTDLP_PATH);
 
 const globalEmitter = new EventEmitter();
-
 
 export const appRouter = createTRPCRouter({
   listVideos: baseProcedure.query(async () => {
@@ -35,8 +34,6 @@ export const appRouter = createTRPCRouter({
       const rawMetadata = await yt.getVideoInfo(url);
       const metadata = z.object({ title: z.string() }).parse(rawMetadata);
 
-
-
       const downloadEmitter = yt.exec([
         "-f",
         "bv*[height<=1080]+ba/b",
@@ -51,20 +48,18 @@ export const appRouter = createTRPCRouter({
         "--output",
         "data/videos/%(uploader)s/%(upload_date>%Y)s/%(upload_date)s %(title)s/%(title)s.%(ext)s",
         url,
-      ])
+      ]);
 
-
-      function handleProgress(progress: unknown) {
-        globalEmitter.emit(url, progress);
-
+      function handleProgress(...args: unknown[]) {
+        globalEmitter.emit(url, ...args);
       }
 
-      function handleYtdlpEvent(event: unknown) {
-        globalEmitter.emit(url, event);
+      function handleYtdlpEvent(...args: unknown[]) {
+        globalEmitter.emit(url, ...args);
       }
 
-      function handleError(error: unknown) {
-        globalEmitter.emit(url, error);
+      function handleError(...args: unknown[]) {
+        globalEmitter.emit(url, ...args);
         downloadEmitter.off("progress", handleProgress);
         downloadEmitter.off("ytDlpEvent", handleYtdlpEvent);
         downloadEmitter.off("error", handleError);
@@ -79,10 +74,10 @@ export const appRouter = createTRPCRouter({
         downloadEmitter.off("close", handleClose);
       }
 
-      downloadEmitter.on("progress", handleProgress)
-      downloadEmitter.on("ytDlpEvent", handleYtdlpEvent)
-      downloadEmitter.on("error", handleError)
-      downloadEmitter.on("close", handleClose)
+      downloadEmitter.on("progress", handleProgress);
+      downloadEmitter.on("ytDlpEvent", handleYtdlpEvent);
+      downloadEmitter.on("error", handleError);
+      downloadEmitter.on("close", handleClose);
 
       return {
         metadata,
@@ -99,18 +94,18 @@ export const appRouter = createTRPCRouter({
       const { url } = opts.input;
 
       return observable<string>((emit) => {
-        function handleProgress(data: unknown) {
-          emit.next(data as string);
+        function handleAllEvents(...args: unknown[]) {
+          const message = JSON.stringify(args);
+          emit.next(message);
         }
 
-        globalEmitter.on(url, handleProgress);
+        globalEmitter.on(url, handleAllEvents);
 
         return () => {
-          globalEmitter.off(url, handleProgress);
+          globalEmitter.off(url, handleAllEvents);
         };
       });
     }),
 });
 
-// export type definition of API
 export type AppRouter = typeof appRouter;

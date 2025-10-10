@@ -76,7 +76,7 @@ export const appRouter = createTRPCRouter({
       title: job.title,
       progress: job.progress,
       status: job.status,
-      error: job.error,
+      steps: job.steps,
     }));
   }),
 
@@ -97,6 +97,7 @@ export const appRouter = createTRPCRouter({
         progress: job.progress,
         status: job.status,
         error: job.error,
+        steps: job.steps,
       };
     }),
 
@@ -119,6 +120,7 @@ export const appRouter = createTRPCRouter({
           progress: job.progress,
           status: job.status,
           error: job.error,
+          steps: job.steps,
         };
       }
 
@@ -144,22 +146,6 @@ export const appRouter = createTRPCRouter({
     )
     .subscription(async function* (opts) {
       for await (const [data] of on(progressEmitter, "finish")) {
-        if (data.jobId !== opts.input.jobId) {
-          continue;
-        }
-        yield data;
-      }
-    }),
-
-  // Real-time log subscription
-  jobLogs: baseProcedure
-    .input(
-      z.object({
-        jobId: z.string(),
-      })
-    )
-    .subscription(async function* (opts) {
-      for await (const [data] of on(progressEmitter, "log")) {
         if (data.jobId !== opts.input.jobId) {
           continue;
         }

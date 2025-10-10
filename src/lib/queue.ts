@@ -10,14 +10,18 @@ const redis = new Redis(env.REDIS_URL, {
     maxRetriesPerRequest: null,
 });
 
-// Create queue - simplified, no retries
+// Create queue
 export const downloadQueue = new Queue("download", {
     connection: redis,
     defaultJobOptions: {
         removeOnComplete: 10,
         removeOnFail: 5,
-        attempts: 1, // No retries - fail fast for visibility
-        delay: 1000, // Small delay before processing
+        attempts: 3,
+        backoff: {
+            type: "exponential",
+            delay: 2000,
+        },
+        delay: 1000, // Add small delay before processing
     },
 });
 
@@ -47,8 +51,9 @@ const worker = new Worker(
             const videoTitle = metadata.title || "Unknown";
             console.log("Video title:", videoTitle);
 
-            // Update title
+            // Update title and complete info step
             await redisStore.updateJob(jobId, { title: videoTitle });
+            await redisStore.completeJobStep(jobId, "info");
 
             // Emit initial progress event after title update
             console.log("Emitting initial progress event after title update");
@@ -66,9 +71,11 @@ const worker = new Worker(
                 },
             });
 
-            // Start download with comprehensive event tracking and log streaming
+            // Start download with comprehensive event tracking
             const downloadPromise = new Promise<void>((resolve, reject) => {
                 let currentStep = "download";
+                let remuxProgress = 0;
+                let subtitleProgress = 0;
 
                 yt.exec([
                     "-f",
@@ -87,39 +94,53 @@ const worker = new Worker(
                 ])
                     .on("progress", async (progress) => {
                         const percent = Number(progress.percent) || 0;
-                        console.log(`Progress:`, percent + "%", progress);
+                        console.log(`Progress [${currentStep}]:`, percent + "%", progress);
 
-                        // Update progress in Redis
-                        await redisStore.updateJob(jobId, { progress: percent });
+                        // Update progress for current step
+                        await redisStore.updateJobProgress(jobId, currentStep as keyof JobData["steps"], percent);
 
                         // Emit progress event for real-time updates
-                        progressEmitter.emit("progress", {
-                            jobId,
-                            url,
-                            title: videoTitle,
-                            progress: percent,
-                            status: "ACTIVE",
-                        });
+                        const jobData = await redisStore.getJob(jobId);
+                        if (jobData) {
+                            console.log("Emitting progress event:", {
+                                jobId,
+                                progress: jobData.progress,
+                                status: jobData.status,
+                                currentStep
+                            });
+                            progressEmitter.emit("progress", {
+                                jobId,
+                                url,
+                                title: jobData.title,
+                                progress: jobData.progress || 0,
+                                status: jobData.status,
+                                steps: jobData.steps,
+                            });
+                        }
                     })
                     .on("ytDlpEvent", (event) => {
-                        // Stream yt-dlp events to UI for debugging
+                        console.log("yt-dlp event:", event);
+
+                        // Detect step changes based on event string
                         if (typeof event === "string") {
-                            console.log("yt-dlp event:", event);
-                            progressEmitter.emit("log", {
-                                jobId,
-                                line: event,
-                                timestamp: new Date().toISOString(),
-                            });
+                            const previousStep = currentStep;
+                            if (event === "info") {
+                                currentStep = "info";
+                            } else if (event === "download") {
+                                currentStep = "download";
+                            } else if (event === "SubtitlesConvertor") {
+                                currentStep = "subtitles";
+                            } else if (event === "Merger") {
+                                currentStep = "remux";
+                            }
+
+                            if (previousStep !== currentStep) {
+                                console.log(`Step changed: ${previousStep} → ${currentStep}`);
+                            }
                         }
                     })
                     .on("error", (error) => {
                         console.error("yt-dlp error:", error);
-                        // Stream error to UI
-                        progressEmitter.emit("log", {
-                            jobId,
-                            line: `ERROR: ${error.message}`,
-                            timestamp: new Date().toISOString(),
-                        });
                         reject(error);
                     })
                     .on("close", (code) => {
@@ -127,50 +148,48 @@ const worker = new Worker(
                         if (code === 0) {
                             resolve();
                         } else {
-                            const errorMsg = `yt-dlp exited with code ${code}`;
-                            console.error(errorMsg);
-                            // Stream exit code to UI
-                            progressEmitter.emit("log", {
-                                jobId,
-                                line: `EXIT: ${errorMsg}`,
-                                timestamp: new Date().toISOString(),
-                            });
-                            reject(new Error(errorMsg));
+                            reject(new Error(`yt-dlp exited with code ${code}`));
                         }
                     });
             });
 
             await downloadPromise;
 
-            // Mark job as completed
+            // Complete all remaining steps
+            await redisStore.completeJobStep(jobId, "download");
+            await redisStore.completeJobStep(jobId, "remux");
+            await redisStore.completeJobStep(jobId, "subtitles");
             await redisStore.completeJob(jobId);
 
             // Emit completion event
-            progressEmitter.emit("finish", {
-                jobId,
-                url,
-                title: videoTitle,
-                status: "COMPLETED",
-            });
+            const jobData = await redisStore.getJob(jobId);
+            if (jobData) {
+                progressEmitter.emit("finish", {
+                    jobId,
+                    url,
+                    title: jobData.title,
+                    status: "COMPLETED",
+                    steps: jobData.steps,
+                });
+            }
 
         } catch (error) {
             console.error("Download job failed:", error);
 
-            // Get current job data for title
+            // Get current job data
             const jobData = await redisStore.getJob(jobId);
-            const title = jobData?.title || "Unknown";
 
             // Mark job as failed
-            const errorMessage = error instanceof Error ? error.message : "Unknown error";
-            await redisStore.failJob(jobId, errorMessage);
+            await redisStore.failJob(jobId, error instanceof Error ? error.message : "Unknown error");
 
             // Emit failure event
             progressEmitter.emit("finish", {
                 jobId,
                 url,
-                title,
+                title: jobData?.title || "Unknown",
                 status: "FAILED",
-                error: errorMessage,
+                error: error instanceof Error ? error.message : "Unknown error",
+                steps: jobData?.steps,
             });
 
             throw error;

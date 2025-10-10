@@ -1,10 +1,31 @@
 import { z } from "zod";
 import { baseProcedure, createTRPCRouter } from "../init";
-import { downloadQueue } from "~/lib/queue";
-import { db } from "~/lib/db";
-import { progressEmitter } from "~/lib/events";
+import YTDlpWrap from "yt-dlp-wrap-plus";
 import fs from "node:fs";
-import { on } from "node:events";
+import EventEmitter, { on } from "node:events";
+import { debounce } from "remeda";
+import env from "~/env";
+
+const yt = new YTDlpWrap(env.YTDLP_PATH);
+
+const progressEmitter = new EventEmitter();
+
+const progressMap = new Map<string, { url: string; percent: number }>();
+
+const debouncer = debounce(
+  () => {
+    progressMap.forEach((progress) => {
+      progressEmitter.emit("progress", progress);
+    });
+    progressMap.clear();
+  },
+  { maxWaitMs: 500 }
+);
+
+function emitProgress(url: string, percent: number) {
+  progressMap.set(url, { url, percent });
+  debouncer.call();
+}
 
 export const appRouter = createTRPCRouter({
   addVideo: baseProcedure
@@ -14,54 +35,36 @@ export const appRouter = createTRPCRouter({
       })
     )
     .mutation(async (opts) => {
-      const { url } = opts.input;
+      const rawMetadata = await yt.getVideoInfo(opts.input.url);
+      const metadata = z.object({ title: z.string() }).parse(rawMetadata);
 
-      // Check if job already exists
-      const existingJob = await db.downloadJob.findUnique({
-        where: { url },
-      });
-
-      if (existingJob) {
-        // If job is pending or active, return existing job
-        if (existingJob.status === "PENDING" || existingJob.status === "ACTIVE") {
-          return {
-            metadata: { title: existingJob.title || "Unknown" },
-            jobId: existingJob.id,
-          };
-        }
-
-        // If job failed or completed, delete it and create a new one
-        if (existingJob.status === "FAILED" || existingJob.status === "COMPLETED") {
-          await db.downloadJob.delete({
-            where: { id: existingJob.id },
+      yt.exec([
+        "-f",
+        "bv*[height<=1080]+ba/b",
+        "--write-info-json",
+        "--write-thumbnail",
+        "--write-subs",
+        "--write-auto-subs",
+        "--sub-langs",
+        "en,en-orig,hu,hu-orig",
+        "--convert-subs",
+        "srt",
+        "--output",
+        "data/videos/%(uploader)s/%(upload_date>%Y)s/%(upload_date)s %(title)s/%(title)s.%(ext)s",
+        opts.input.url,
+      ])
+        .on("progress", (progress) => {
+          emitProgress(opts.input.url, Number(progress.percent));
+        })
+        // .on("ytDlpEvent", (...args) => console.log("ytdlpevent", args))
+        .on("error", (error) => console.error(error))
+        .on("close", () => {
+          progressEmitter.emit("finish", {
+            url: opts.input.url,
           });
-        }
-      }
-
-      // Create new job in database
-      const job = await db.downloadJob.create({
-        data: {
-          url,
-          status: "PENDING",
-          progress: 0,
-        },
-      });
-
-      // Add job to BullMQ queue
-      const bullJob = await downloadQueue.add("download", {
-        url,
-        dbJobId: job.id,
-      });
-
-      // Update job with BullMQ job ID
-      await db.downloadJob.update({
-        where: { id: job.id },
-        data: { bullJobId: bullJob.id },
-      });
-
+        });
       return {
-        metadata: { title: job.title || "Unknown" },
-        jobId: job.id,
+        metadata,
       };
     }),
   listVideos: baseProcedure.query(async () => {
@@ -75,107 +78,36 @@ export const appRouter = createTRPCRouter({
 
     return videos;
   }),
-  // Get all active jobs for persistent progress
-  getActiveJobs: baseProcedure.query(async () => {
-    // Clean up old completed/failed jobs (older than 1 hour)
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-    await db.downloadJob.deleteMany({
-      where: {
-        status: {
-          in: ["COMPLETED", "FAILED"],
-        },
-        updatedAt: {
-          lt: oneHourAgo,
-        },
-      },
-    });
-
-    const jobs = await db.downloadJob.findMany({
-      where: {
-        status: {
-          in: ["PENDING", "ACTIVE"],
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-
-    return jobs.map(job => ({
-      id: job.id,
-      url: job.url,
-      title: job.title || "Unknown",
-      progress: job.progress,
-      status: job.status,
-    }));
-  }),
-
-  // Get job progress by ID
-  getJobProgress: baseProcedure
-    .input(z.object({ jobId: z.string() }))
-    .query(async ({ input }) => {
-      const job = await db.downloadJob.findUnique({
-        where: { id: input.jobId },
-      });
-
-      if (!job) {
-        throw new Error("Job not found");
-      }
-
-      return {
-        id: job.id,
-        url: job.url,
-        title: job.title || "Unknown",
-        progress: job.progress,
-        status: job.status,
-        error: job.error,
-      };
-    }),
-
-  // Real-time progress subscription
-  jobProgress: baseProcedure
+  videoProgress: baseProcedure
     .input(
       z.object({
-        jobId: z.string(),
+        url: z.string(),
       })
     )
     .subscription(async function* (opts) {
-      // First, get current progress from database
-      const job = await db.downloadJob.findUnique({
-        where: { id: opts.input.jobId },
-      });
-
-      if (job) {
-        yield {
-          jobId: job.id,
-          url: job.url,
-          title: job.title || "Unknown",
-          progress: job.progress,
-          status: job.status,
-          error: job.error,
-        };
-      }
-
-      // Then listen for real-time updates
       for await (const [data] of on(progressEmitter, "progress")) {
-        if (data.jobId !== opts.input.jobId) {
+        if (data.url !== opts.input.url) {
           continue;
         }
-        yield data;
+        const url: string = data.url;
+        const percent: number = data.percent;
+        yield { url, percent };
       }
     }),
 
-  // Job finished subscription
-  jobFinished: baseProcedure
+  videoFinished: baseProcedure
     .input(
       z.object({
-        jobId: z.string(),
+        url: z.string(),
       })
     )
     .subscription(async function* (opts) {
       for await (const [data] of on(progressEmitter, "finish")) {
-        if (data.jobId !== opts.input.jobId) {
+        if (data.url !== opts.input.url) {
           continue;
         }
-        yield data;
+        const url: string = data.url;
+        yield { url };
       }
     }),
 });

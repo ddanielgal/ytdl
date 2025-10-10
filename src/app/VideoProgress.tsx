@@ -32,7 +32,7 @@ export default function VideoProgress() {
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <div>
+          <div className="flex flex-col gap-2">
             <CardTitle>{title}</CardTitle>
             <CardDescription>{url}</CardDescription>
           </div>
@@ -43,7 +43,7 @@ export default function VideoProgress() {
           {messages.length > 0 ? (
             <div className="border rounded-md bg-muted/50 relative">
               <Button
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 onClick={() => setIsExpanded(!isExpanded)}
                 className="absolute top-2 right-2 z-10 flex items-center gap-1"
@@ -60,9 +60,22 @@ export default function VideoProgress() {
                   </>
                 )}
               </Button>
-              <pre className="text-xs p-3 overflow-x-auto whitespace-pre-wrap font-mono">
-                {(isExpanded ? messages : messages.slice(-5)).join("\n")}
-              </pre>
+              <div className="text-xs p-3 font-mono">
+                {(isExpanded ? messages : messages.slice(-5)).map(
+                  (message, index) => (
+                    <div
+                      key={index}
+                      className={
+                        isExpanded
+                          ? "whitespace-pre-wrap break-words"
+                          : "whitespace-nowrap overflow-hidden text-ellipsis"
+                      }
+                    >
+                      {message}
+                    </div>
+                  )
+                )}
+              </div>
             </div>
           ) : null}
         </div>

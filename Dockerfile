@@ -25,13 +25,18 @@ COPY .next/ ./.next/
 COPY next.config.mjs ./next.config.mjs
 COPY package.json ./package.json
 
+# Install remaining dependencies
 RUN apt-get update && apt-get install -y ffmpeg
 
-# Set the NODE_ENV environment variable to production
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+
+ENV PATH=/root/.local/bin:$PATH
+RUN uv venv /opt/venv
+ENV PATH=/opt/venv/bin:$PATH
+RUN uv pip install curl-cffi
+
 ENV NODE_ENV production
 
-# Expose the port the app runs on
 EXPOSE 3000
 
-# Start the Next.js application
 CMD ["npm", "start"]

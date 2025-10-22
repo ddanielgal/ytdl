@@ -48,6 +48,8 @@ export const appRouter = createTRPCRouter({
         "--convert-subs",
         "srt",
         "--ignore-errors",
+        "--extractor-args",
+        "youtube:player_js_version=actual",
         "--output",
         "data/videos/%(uploader)s/%(upload_date>%Y)s/%(upload_date)s %(title)s/%(title)s.%(ext)s",
         url,

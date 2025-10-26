@@ -141,53 +141,65 @@ export const appRouter = createTRPCRouter({
       });
     }),
 
-  getQueueStats: baseProcedure.query(async () => {
-    const waiting = await videoQueue.getWaiting();
-    const active = await videoQueue.getActive();
-    const completed = await videoQueue.getCompleted();
-    const failed = await videoQueue.getFailed();
+  getQueueStats: baseProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).default(20),
+        cursor: z.number().nullish(),
+      })
+    )
+    .query(async ({ input }) => {
+      const { limit, cursor } = input;
+      const start = cursor ?? 0;
+      const end = start + limit - 1;
 
-    const allJobs = [
-      ...waiting.map((job) => ({
-        id: job.id,
-        name: job.name,
-        data: job.data,
-        status: "waiting" as const,
-        createdAt: job.timestamp,
-      })),
-      ...active.map((job) => ({
-        id: job.id,
-        name: job.name,
-        data: job.data,
-        status: "active" as const,
-        createdAt: job.timestamp,
-        startedAt: job.processedOn,
-      })),
-      ...completed.map((job) => ({
-        id: job.id,
-        name: job.name,
-        data: job.data,
-        status: "completed" as const,
-        createdAt: job.timestamp,
-        completedAt: job.finishedOn,
-      })),
-      ...failed.map((job) => ({
-        id: job.id,
-        name: job.name,
-        data: job.data,
-        status: "failed" as const,
-        createdAt: job.timestamp,
-        failedAt: job.finishedOn,
-        error: job.failedReason,
-      })),
-    ];
+      const allJobs = await videoQueue.getJobs(
+        ["wait", "active", "completed", "failed"],
+        start,
+        end,
+        false // desc order
+      );
 
-    allJobs.sort((a, b) => b.createdAt - a.createdAt);
+      // Map jobs to serializable objects with status using primitive properties
+      const serializableJobs = allJobs.map((job) => {
+        // Determine status using primitive job properties (no async calls)
+        let status: string;
+        if (job.failedReason) {
+          status = "failed";
+        } else if (job.finishedOn && !job.failedReason) {
+          status = "completed";
+        } else if (job.processedOn && !job.finishedOn) {
+          status = "active";
+        } else {
+          status = "waiting";
+        }
 
-    return {
-      jobs: allJobs,
-    };
-  }),
+        return {
+          id: job.id,
+          name: job.name,
+          data: job.data,
+          status,
+        };
+      });
+
+      const counts = await videoQueue.getJobCounts(
+        "wait",
+        "active",
+        "completed",
+        "failed"
+      );
+
+      const totalJobs =
+        counts.wait + counts.active + counts.completed + counts.failed;
+
+      const nextCursor = end < totalJobs - 1 ? end + 1 : null;
+
+      return {
+        jobs: serializableJobs,
+        nextCursor,
+        totalJobs,
+      };
+    }),
 });
 
 export type AppRouter = typeof appRouter;

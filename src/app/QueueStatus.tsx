@@ -2,26 +2,35 @@
 
 import { trpc } from "~/trpc/client";
 import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
 
 export default function QueueStatus() {
-  const { data: queueStats, isLoading } = trpc.getQueueStats.useQuery();
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    trpc.getQueueStats.useInfiniteQuery(
+      { limit: 20 },
+      {
+        getNextPageParam: (lastPage) => lastPage.nextCursor,
+      }
+    );
+
+  function handleFetchNextPage() {
+    fetchNextPage();
+  }
 
   if (isLoading) {
     return null;
   }
 
-  if (!queueStats) {
-    return null;
-  }
+  const allJobs = data?.pages.flatMap((page) => page.jobs) ?? [];
 
-  if (queueStats.jobs.length === 0) {
+  if (allJobs.length === 0) {
     return null;
   }
 
   return (
     <div className="w-full">
       <div className="space-y-2">
-        {queueStats.jobs.map((job) => (
+        {allJobs.map((job) => (
           <div
             key={job.id}
             className="flex items-center justify-between p-3 border rounded-lg"
@@ -33,6 +42,18 @@ export default function QueueStatus() {
           </div>
         ))}
       </div>
+
+      {hasNextPage && (
+        <div className="mt-4 flex justify-center">
+          <Button
+            onClick={handleFetchNextPage}
+            disabled={isFetchingNextPage}
+            variant="outline"
+          >
+            {isFetchingNextPage ? "Loading..." : "Load More"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

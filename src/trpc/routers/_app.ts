@@ -23,6 +23,7 @@ export const appRouter = createTRPCRouter({
 
     return videos;
   }),
+
   addVideo: baseProcedure
     .input(
       z.object({
@@ -35,7 +36,6 @@ export const appRouter = createTRPCRouter({
       const rawMetadata = await yt.getVideoInfo(url);
       const metadata = z.object({ title: z.string() }).parse(rawMetadata);
 
-      // Add job to queue
       const job = await videoQueue.add("download video", {
         url,
         title: metadata.title,
@@ -47,8 +47,7 @@ export const appRouter = createTRPCRouter({
       };
     }),
 
-  // Realtime implementation (old EventEmitter-based)
-  realtimeAddVideo: baseProcedure
+  simpleAddVideo: baseProcedure
     .input(
       z.object({
         url: z.string(),
@@ -117,7 +116,7 @@ export const appRouter = createTRPCRouter({
       };
     }),
 
-  realtimeVideoProgress: baseProcedure
+  simpleVideoProgress: baseProcedure
     .input(
       z.object({
         url: z.string(),
@@ -142,65 +141,53 @@ export const appRouter = createTRPCRouter({
       });
     }),
 
-  // Queue status queries
   getQueueStats: baseProcedure.query(async () => {
     const waiting = await videoQueue.getWaiting();
     const active = await videoQueue.getActive();
     const completed = await videoQueue.getCompleted();
     const failed = await videoQueue.getFailed();
 
-    return {
-      waiting: waiting.length,
-      active: active.length,
-      completed: completed.length,
-      failed: failed.length,
-      jobs: {
-        waiting: waiting.map((job) => ({
-          id: job.id,
-          name: job.name,
-          data: job.data,
-          createdAt: job.timestamp,
-        })),
-        active: active.map((job) => ({
-          id: job.id,
-          name: job.name,
-          data: job.data,
-          startedAt: job.processedOn,
-        })),
-        completed: completed.map((job) => ({
-          id: job.id,
-          name: job.name,
-          data: job.data,
-          completedAt: job.finishedOn,
-        })),
-        failed: failed.map((job) => ({
-          id: job.id,
-          name: job.name,
-          data: job.data,
-          failedAt: job.finishedOn,
-          error: job.failedReason,
-        })),
-      },
-    };
-  }),
-
-  getJobStatus: baseProcedure
-    .input(z.object({ jobId: z.string() }))
-    .query(async ({ input }) => {
-      const job = await videoQueue.getJob(input.jobId);
-      if (!job) return null;
-
-      return {
+    const allJobs = [
+      ...waiting.map((job) => ({
         id: job.id,
         name: job.name,
         data: job.data,
-        state: await job.getState(),
+        status: "waiting" as const,
         createdAt: job.timestamp,
-        processedOn: job.processedOn,
-        finishedOn: job.finishedOn,
-        failedReason: job.failedReason,
-      };
-    }),
+      })),
+      ...active.map((job) => ({
+        id: job.id,
+        name: job.name,
+        data: job.data,
+        status: "active" as const,
+        createdAt: job.timestamp,
+        startedAt: job.processedOn,
+      })),
+      ...completed.map((job) => ({
+        id: job.id,
+        name: job.name,
+        data: job.data,
+        status: "completed" as const,
+        createdAt: job.timestamp,
+        completedAt: job.finishedOn,
+      })),
+      ...failed.map((job) => ({
+        id: job.id,
+        name: job.name,
+        data: job.data,
+        status: "failed" as const,
+        createdAt: job.timestamp,
+        failedAt: job.finishedOn,
+        error: job.failedReason,
+      })),
+    ];
+
+    allJobs.sort((a, b) => b.createdAt - a.createdAt);
+
+    return {
+      jobs: allJobs,
+    };
+  }),
 });
 
 export type AppRouter = typeof appRouter;

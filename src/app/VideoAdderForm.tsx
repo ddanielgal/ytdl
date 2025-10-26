@@ -7,11 +7,11 @@ import { Button } from "~/components/ui/button";
 
 export default function VideoAdderForm() {
   const [url, setUrl] = useState("");
+  const utils = trpc.useUtils();
   const { mutate: addVideo, isPending } = trpc.addVideo.useMutation({
     onSuccess: ({ metadata, jobId }) => {
-      // Job is now queued, we'll track it via queue status
-      console.log(`Video "${metadata.title}" queued with job ID: ${jobId}`);
       setUrl("");
+      utils.getQueueStats.invalidate();
     },
   });
   return (

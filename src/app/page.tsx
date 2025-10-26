@@ -1,7 +1,6 @@
 import { HydrateClient } from "~/trpc/server";
 import VideoAdderForm from "./VideoAdderForm";
-import VideoList from "./VideoList";
-import QueueStatus from "./QueueStatus";
+import JobsList from "./JobsList";
 
 export default function Home() {
   return (
@@ -12,7 +11,7 @@ export default function Home() {
             <VideoAdderForm />
           </section>
           <section>
-            <QueueStatus />
+            <JobsList />
           </section>
         </main>
       </div>

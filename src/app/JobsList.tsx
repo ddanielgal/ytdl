@@ -4,7 +4,7 @@ import { trpc } from "~/trpc/client";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 
-export default function QueueStatus() {
+export default function JobsList() {
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
     trpc.getQueueStats.useInfiniteQuery(
       { limit: 20 },
@@ -36,7 +36,9 @@ export default function QueueStatus() {
             className="flex items-center justify-between p-3 border rounded-lg"
           >
             <div className="flex-1">
-              <div className="font-medium">{job.data.title}</div>
+              <div className="font-medium">
+                {job.data.uploader}: {job.data.title}
+              </div>
             </div>
             <Badge variant="secondary">{job.status}</Badge>
           </div>

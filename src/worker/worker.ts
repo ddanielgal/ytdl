@@ -1,7 +1,6 @@
 import "dotenv/config";
 import { Worker, Job } from "bullmq";
 import YTDlpWrap from "yt-dlp-wrap-plus";
-import fs from "node:fs";
 import env from "~/env";
 import { VideoJobData } from "~/lib/queue";
 

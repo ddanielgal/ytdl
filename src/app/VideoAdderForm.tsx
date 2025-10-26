@@ -2,19 +2,15 @@
 
 import { useState } from "react";
 import { trpc } from "~/trpc/client";
-import { addVideo as addDownloadingVideo } from "./actions";
 import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
 
 export default function VideoAdderForm() {
   const [url, setUrl] = useState("");
   const { mutate: addVideo, isPending } = trpc.addVideo.useMutation({
-    onSuccess: ({ metadata }) => {
-      addDownloadingVideo({
-        url,
-        title: metadata.title,
-        messages: []
-      });
+    onSuccess: ({ metadata, jobId }) => {
+      // Job is now queued, we'll track it via queue status
+      console.log(`Video "${metadata.title}" queued with job ID: ${jobId}`);
       setUrl("");
     },
   });

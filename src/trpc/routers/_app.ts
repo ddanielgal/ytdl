@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { baseProcedure, createTRPCRouter } from "../init";
-import YTDlpWrap from "yt-dlp-wrap-plus";
 import fs from "node:fs";
 import EventEmitter from "node:events";
-import env from "~/env";
 import { observable } from "@trpc/server/observable";
+import { videoQueue } from "~/lib/queue";
+import YTDlpWrap from "yt-dlp-wrap-plus";
+import env from "~/env";
 
 const yt = new YTDlpWrap(env.YTDLP_PATH);
 
@@ -34,63 +35,19 @@ export const appRouter = createTRPCRouter({
       const rawMetadata = await yt.getVideoInfo(url);
       const metadata = z.object({ title: z.string() }).parse(rawMetadata);
 
-      console.log("start", url);
-
-      const downloadEmitter = yt.exec([
-        "-f",
-        "bv*[height<=1080]+ba/b",
-        "--write-info-json",
-        "--write-thumbnail",
-        "--write-subs",
-        "--write-auto-subs",
-        "--sub-langs",
-        "en,en-orig,hu,hu-orig",
-        "--convert-subs",
-        "srt",
-        "--ignore-errors",
-        "--extractor-args",
-        "youtube:player_js_version=actual",
-        "--output",
-        "data/videos/%(uploader)s/%(upload_date>%Y)s/%(upload_date)s %(title)s/%(title)s.%(ext)s",
+      // Add job to queue
+      const job = await videoQueue.add("download video", {
         url,
-      ]);
-
-      function handleProgress(...args: unknown[]) {
-        globalEmitter.emit(url, ...args);
-      }
-
-      function handleYtdlpEvent(...args: unknown[]) {
-        globalEmitter.emit(url, ...args);
-      }
-
-      function handleError(...args: unknown[]) {
-        console.error(url, args);
-        globalEmitter.emit(url, ...args);
-        downloadEmitter.off("progress", handleProgress);
-        downloadEmitter.off("ytDlpEvent", handleYtdlpEvent);
-        downloadEmitter.off("error", handleError);
-        downloadEmitter.off("close", handleClose);
-      }
-
-      function handleClose() {
-        console.info("close", url);
-        globalEmitter.emit(url, "finish");
-        downloadEmitter.off("progress", handleProgress);
-        downloadEmitter.off("ytDlpEvent", handleYtdlpEvent);
-        downloadEmitter.off("error", handleError);
-        downloadEmitter.off("close", handleClose);
-      }
-
-      downloadEmitter.on("progress", handleProgress);
-      downloadEmitter.on("ytDlpEvent", handleYtdlpEvent);
-      downloadEmitter.on("error", handleError);
-      downloadEmitter.on("close", handleClose);
+        title: metadata.title,
+      });
 
       return {
         metadata,
+        jobId: job.id,
       };
     }),
 
+  // Keep existing progress subscription (dead code for now)
   videoProgress: baseProcedure
     .input(
       z.object({
@@ -114,6 +71,66 @@ export const appRouter = createTRPCRouter({
           console.info("off", url);
         };
       });
+    }),
+
+  // Queue status queries
+  getQueueStats: baseProcedure.query(async () => {
+    const waiting = await videoQueue.getWaiting();
+    const active = await videoQueue.getActive();
+    const completed = await videoQueue.getCompleted();
+    const failed = await videoQueue.getFailed();
+
+    return {
+      waiting: waiting.length,
+      active: active.length,
+      completed: completed.length,
+      failed: failed.length,
+      jobs: {
+        waiting: waiting.map((job) => ({
+          id: job.id,
+          name: job.name,
+          data: job.data,
+          createdAt: job.timestamp,
+        })),
+        active: active.map((job) => ({
+          id: job.id,
+          name: job.name,
+          data: job.data,
+          startedAt: job.processedOn,
+        })),
+        completed: completed.map((job) => ({
+          id: job.id,
+          name: job.name,
+          data: job.data,
+          completedAt: job.finishedOn,
+        })),
+        failed: failed.map((job) => ({
+          id: job.id,
+          name: job.name,
+          data: job.data,
+          failedAt: job.finishedOn,
+          error: job.failedReason,
+        })),
+      },
+    };
+  }),
+
+  getJobStatus: baseProcedure
+    .input(z.object({ jobId: z.string() }))
+    .query(async ({ input }) => {
+      const job = await videoQueue.getJob(input.jobId);
+      if (!job) return null;
+
+      return {
+        id: job.id,
+        name: job.name,
+        data: job.data,
+        state: await job.getState(),
+        createdAt: job.timestamp,
+        processedOn: job.processedOn,
+        finishedOn: job.finishedOn,
+        failedReason: job.failedReason,
+      };
     }),
 });
 

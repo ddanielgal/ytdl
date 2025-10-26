@@ -164,6 +164,9 @@ export const appRouter = createTRPCRouter({
       );
 
       const jobs = allJobs.map((job) => {
+        if (!job.id) {
+          throw new Error("Job has no id");
+        }
         if (job.failedReason) {
           return {
             id: job.id,

@@ -6,7 +6,7 @@ import { addVideo as addDownloadingVideo } from "../actions";
 import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
 
-export default function RealtimeVideoAdderForm() {
+export default function SimpleVideoAdderForm() {
   const [url, setUrl] = useState("");
   const { mutate: addVideo, isPending } = trpc.realtimeAddVideo.useMutation({
     onSuccess: ({ metadata }) => {

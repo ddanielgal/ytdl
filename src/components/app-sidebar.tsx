@@ -35,8 +35,8 @@ export function AppSidebar() {
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === "/realtime"}>
-                  <Link href="/realtime">
+                <SidebarMenuButton asChild isActive={pathname === "/simple"}>
+                  <Link href="/simple">
                     <ArrowDownToLine />
                     <span>Simple</span>
                   </Link>

@@ -4,7 +4,7 @@ import useStore from "../store";
 import { VideoContext } from "../VideoContext";
 import VideoProgress from "../VideoProgress";
 
-export default function RealtimeProgressList() {
+export default function SimpleProgressList() {
   const videos = useStore((s) => s.videosDownloading);
 
   return (

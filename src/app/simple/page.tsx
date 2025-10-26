@@ -1,17 +1,17 @@
 import { HydrateClient } from "~/trpc/server";
-import RealtimeVideoAdderForm from "./RealtimeVideoAdderForm";
-import RealtimeProgressList from "./RealtimeProgressList";
+import SimpleVideoAdderForm from "./SimpleVideoAdderForm";
+import SimpleProgressList from "./SimpleProgressList";
 
-export default function RealtimePage() {
+export default function SimplePage() {
   return (
     <HydrateClient>
       <div className="flex h-screen w-full flex-col items-center p-8">
         <main className="flex flex-col w-full max-w-xl gap-8">
           <section className="w-full">
-            <RealtimeVideoAdderForm />
+            <SimpleVideoAdderForm />
           </section>
           <section>
-            <RealtimeProgressList />
+            <SimpleProgressList />
           </section>
         </main>
       </div>

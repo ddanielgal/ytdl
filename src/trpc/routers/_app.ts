@@ -144,6 +144,28 @@ export const appRouter = createTRPCRouter({
       });
     }),
 
+  deleteFailedJob: baseProcedure
+    .input(
+      z.object({
+        jobId: z.string(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const { jobId } = input;
+
+      const job = await videoQueue.getJob(jobId);
+
+      if (!job) {
+        throw new Error("Job not found");
+      }
+
+      await job.remove();
+
+      return {
+        deletedJobId: jobId,
+      };
+    }),
+
   getQueueStats: baseProcedure
     .input(
       z.object({

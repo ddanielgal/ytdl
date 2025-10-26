@@ -9,7 +9,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
-import { RefreshCw, ChevronUp, ChevronDown, RotateCcw } from "lucide-react";
+import {
+  RefreshCw,
+  ChevronUp,
+  ChevronDown,
+  RotateCcw,
+  Trash2,
+} from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
 
@@ -33,7 +39,13 @@ export default function JobsList() {
 
   const utils = trpc.useUtils();
 
-  const addVideoMutation = trpc.addVideo.useMutation({
+  const retryJobMutation = trpc.addVideo.useMutation({
+    onSuccess: () => {
+      utils.getQueueStats.invalidate();
+    },
+  });
+
+  const deleteJobMutation = trpc.deleteFailedJob.useMutation({
     onSuccess: () => {
       utils.getQueueStats.invalidate();
     },
@@ -64,11 +76,21 @@ export default function JobsList() {
       .object({ data: z.object({ url: z.string() }) })
       .safeParse(rawJob);
     if (!jobParseResult.success) {
+      console.error("Job does not have a URL", rawJob);
+      return;
+    }
+    const job = jobParseResult.data;
+    retryJobMutation.mutate({ url: job.data.url });
+  }
+
+  function handleDeleteJob(rawJob: unknown) {
+    const jobParseResult = z.object({ id: z.string() }).safeParse(rawJob);
+    if (!jobParseResult.success) {
       console.error("Job does not have an ID", rawJob);
       return;
     }
     const job = jobParseResult.data;
-    addVideoMutation.mutate({ url: job.data.url });
+    deleteJobMutation.mutate({ jobId: job.id });
   }
 
   if (isLoading) {
@@ -144,11 +166,21 @@ export default function JobsList() {
                         variant="secondary"
                         size="sm"
                         onClick={() => handleRetryJob(job)}
-                        disabled={addVideoMutation.isPending}
+                        disabled={retryJobMutation.isPending}
                         className="flex items-center gap-1"
                       >
                         <RotateCcw className="h-4 w-4" />
                         Retry
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleDeleteJob(job)}
+                        disabled={deleteJobMutation.isPending}
+                        className="flex items-center gap-1"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete
                       </Button>
                     </div>
                   )}

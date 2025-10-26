@@ -3,6 +3,12 @@
 import { trpc } from "~/trpc/client";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 
 export default function JobsList() {
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
@@ -28,34 +34,45 @@ export default function JobsList() {
   }
 
   return (
-    <div className="w-full">
-      <div className="space-y-2">
-        {allJobs.map((job) => (
-          <div
-            key={job.id}
-            className="flex items-center justify-between p-3 border rounded-lg"
-          >
-            <div className="flex-1">
-              <div className="font-medium">
-                {job.data.uploader}: {job.data.title}
-              </div>
+    <TooltipProvider>
+      <div className="w-full">
+        <div className="space-y-2">
+          {allJobs.map((job) => (
+            <div
+              key={job.id}
+              className="flex items-center gap-3 p-3 border rounded-lg"
+            >
+              <Badge variant="secondary">{job.status}</Badge>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">
+                      {job.data.uploader}: {job.data.title}
+                    </div>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>
+                    {job.data.uploader}: {job.data.title}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
             </div>
-            <Badge variant="secondary">{job.status}</Badge>
-          </div>
-        ))}
-      </div>
-
-      {hasNextPage && (
-        <div className="mt-4 flex justify-center">
-          <Button
-            onClick={handleFetchNextPage}
-            disabled={isFetchingNextPage}
-            variant="outline"
-          >
-            {isFetchingNextPage ? "Loading..." : "Load More"}
-          </Button>
+          ))}
         </div>
-      )}
-    </div>
+
+        {hasNextPage && (
+          <div className="mt-4 flex justify-center">
+            <Button
+              onClick={handleFetchNextPage}
+              disabled={isFetchingNextPage}
+              variant="outline"
+            >
+              {isFetchingNextPage ? "Loading..." : "Load More"}
+            </Button>
+          </div>
+        )}
+      </div>
+    </TooltipProvider>
   );
 }

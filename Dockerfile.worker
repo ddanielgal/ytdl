@@ -11,6 +11,6 @@ ENV PATH=/opt/venv/bin:$PATH
 RUN uv pip install curl-cffi
 COPY package*.json ./
 RUN npm ci --omit=dev
-COPY src/worker/worker.ts ./src/worker/worker.ts
+COPY src/ ./src/
 COPY tsconfig.json ./
 CMD ["npm", "run", "worker"]

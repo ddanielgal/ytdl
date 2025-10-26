@@ -46,6 +46,7 @@ metadata:
 spec:
   selector:
     app: ytdl
+    component: app
   ports:
     - protocol: TCP
       port: 80

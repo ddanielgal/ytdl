@@ -157,24 +157,20 @@ export const appRouter = createTRPCRouter({
       const end = start + limit - 1;
 
       const allJobs = await videoQueue.getJobs(
-        ["wait", "active", "completed", "failed"],
+        ["failed", "active", "wait", "completed"],
         start,
         end,
         false // desc order
       );
 
-      // Map jobs to serializable objects with status using primitive properties
-      const serializableJobs = allJobs.map((job) => {
-        // Determine status using primitive job properties (no async calls)
-        let status: string;
+      const jobs = allJobs.map((job) => {
+        let status = "waiting";
         if (job.failedReason) {
           status = "failed";
         } else if (job.finishedOn && !job.failedReason) {
           status = "completed";
         } else if (job.processedOn && !job.finishedOn) {
           status = "active";
-        } else {
-          status = "waiting";
         }
 
         return {
@@ -182,6 +178,7 @@ export const appRouter = createTRPCRouter({
           name: job.name,
           data: job.data,
           status,
+          failedReason: job.failedReason,
         };
       });
 
@@ -198,7 +195,7 @@ export const appRouter = createTRPCRouter({
       const nextCursor = end < totalJobs - 1 ? end + 1 : null;
 
       return {
-        jobs: serializableJobs,
+        jobs,
         nextCursor,
         totalJobs,
       };

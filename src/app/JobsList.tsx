@@ -9,18 +9,30 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
+import { RefreshCw } from "lucide-react";
 
 export default function JobsList() {
-  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    trpc.getQueueStats.useInfiniteQuery(
-      { limit: 20 },
-      {
-        getNextPageParam: (lastPage) => lastPage.nextCursor,
-      }
-    );
+  const {
+    data,
+    isLoading,
+    isRefetching,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    refetch,
+  } = trpc.getQueueStats.useInfiniteQuery(
+    { limit: 20 },
+    {
+      getNextPageParam: (lastPage) => lastPage.nextCursor,
+    }
+  );
 
   function handleFetchNextPage() {
     fetchNextPage();
+  }
+
+  function handleRefresh() {
+    refetch();
   }
 
   if (isLoading) {
@@ -36,13 +48,28 @@ export default function JobsList() {
   return (
     <TooltipProvider>
       <div className="w-full">
+        <div className="flex justify-end items-center mb-4">
+          <Button
+            onClick={handleRefresh}
+            variant="outline"
+            size="sm"
+            disabled={isRefetching}
+          >
+            <RefreshCw />
+            Refresh
+          </Button>
+        </div>
         <div className="space-y-2">
           {allJobs.map((job) => (
             <div
               key={job.id}
               className="flex items-center gap-3 p-3 border rounded-lg"
             >
-              <Badge variant="secondary">{job.status}</Badge>
+              <Badge
+                variant={job.status === "failed" ? "destructive" : "secondary"}
+              >
+                {job.status}
+              </Badge>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div className="flex-1 min-w-0">

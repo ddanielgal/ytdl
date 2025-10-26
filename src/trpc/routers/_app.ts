@@ -164,22 +164,36 @@ export const appRouter = createTRPCRouter({
       );
 
       const jobs = allJobs.map((job) => {
-        let status = "waiting";
         if (job.failedReason) {
-          status = "failed";
+          return {
+            id: job.id,
+            name: job.name,
+            data: job.data,
+            status: "failed" as const,
+            failedReason: job.failedReason,
+          };
         } else if (job.finishedOn && !job.failedReason) {
-          status = "completed";
+          return {
+            id: job.id,
+            name: job.name,
+            data: job.data,
+            status: "completed" as const,
+          };
         } else if (job.processedOn && !job.finishedOn) {
-          status = "active";
+          return {
+            id: job.id,
+            name: job.name,
+            data: job.data,
+            status: "active" as const,
+          };
+        } else {
+          return {
+            id: job.id,
+            name: job.name,
+            data: job.data,
+            status: "waiting" as const,
+          };
         }
-
-        return {
-          id: job.id,
-          name: job.name,
-          data: job.data,
-          status,
-          failedReason: job.failedReason,
-        };
       });
 
       const counts = await videoQueue.getJobCounts(

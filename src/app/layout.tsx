@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { TRPCProvider } from "~/trpc/client";
 import { AppSidebar } from "~/components/app-sidebar";
-import { SidebarProvider, SidebarTrigger } from "~/components/ui/sidebar";
+import { SidebarProvider } from "~/components/ui/sidebar";
 
 export const metadata: Metadata = {
   title: "ytdl",
@@ -18,12 +18,9 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <TRPCProvider>
-          <SidebarProvider>
+          <SidebarProvider defaultOpen={true}>
             <AppSidebar />
-            <main className="flex-1">
-              <SidebarTrigger />
-              {children}
-            </main>
+            <main className="flex-1">{children}</main>
           </SidebarProvider>
         </TRPCProvider>
       </body>

@@ -26,14 +26,14 @@ spec:
       containers:
         - name: ytdl
           image: ytdl:latest
-        ports:
-        - containerPort: 3000
-        envFrom:
-        - configMapRef:
-            name: ytdl
-        volumeMounts:
-        - name: ytdl
-          mountPath: /app/data
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: ytdl
+          volumeMounts:
+            - name: ytdl
+              mountPath: /app/data
       volumes:
         - name: ytdl
           persistentVolumeClaim:

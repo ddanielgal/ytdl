@@ -17,12 +17,12 @@ spec:
       containers:
         - name: ytdl-worker
           image: ytdl-worker:latest
-        envFrom:
-        - configMapRef:
-            name: ytdl
-        volumeMounts:
-        - name: ytdlq
-          mountPath: /app/data
+          envFrom:
+            - configMapRef:
+                name: ytdl
+          volumeMounts:
+            - name: ytdlq
+              mountPath: /app/data
       volumes:
         - name: ytdlq
           persistentVolumeClaim:

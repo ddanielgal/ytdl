@@ -5,7 +5,7 @@ import RealtimeProgressList from "./RealtimeProgressList";
 export default function RealtimePage() {
   return (
     <HydrateClient>
-      <div className="flex h-screen w-screen flex-col items-center p-8">
+      <div className="flex h-screen w-full flex-col items-center p-8">
         <main className="flex flex-col w-full max-w-xl gap-8">
           <div className="w-full">
             <h1 className="text-2xl font-bold mb-4">Realtime Downloads</h1>

@@ -19,11 +19,11 @@ spec:
           image: ytdl-worker:latest
         envFrom:
         - configMapRef:
-            name: ytdl-config
+            name: ytdl
         volumeMounts:
-        - name: data-volume
+        - name: ytdlq
           mountPath: /app/data
       volumes:
-        - name: data-volume
+        - name: ytdlq
           persistentVolumeClaim:
-            claimName: ytdl-data-pvc
+            claimName: ytdlq

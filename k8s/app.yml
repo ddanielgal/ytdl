@@ -1,0 +1,69 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ytdl
+data:
+  YTDLP_PATH: "/app/bin/yt-dlp"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ytdl
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ytdl
+      component: app
+  template:
+    metadata:
+      labels:
+        app: ytdl
+        component: app
+    spec:
+      containers:
+        - name: ytdl
+          image: ytdl:latest
+        ports:
+        - containerPort: 3000
+        envFrom:
+        - configMapRef:
+            name: ytdl
+        volumeMounts:
+        - name: ytdl
+          mountPath: /app/data
+      volumes:
+        - name: ytdl
+          persistentVolumeClaim:
+            claimName: ytdl
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ytdl
+spec:
+  selector:
+    app: ytdl
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ytdl
+spec:
+  rules:
+    - host: pi.home
+      http:
+        paths:
+          - pathType: Prefix
+            path: /ytdl
+            backend:
+              service:
+                name: ytdl
+                port:
+                  number: 80

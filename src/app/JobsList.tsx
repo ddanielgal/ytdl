@@ -9,8 +9,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
-import { RefreshCw, ChevronUp, ChevronDown } from "lucide-react";
+import { RefreshCw, ChevronUp, ChevronDown, RotateCcw } from "lucide-react";
 import { useState } from "react";
+import { z } from "zod";
 
 export default function JobsList() {
   const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set());
@@ -30,6 +31,14 @@ export default function JobsList() {
     }
   );
 
+  const utils = trpc.useUtils();
+
+  const addVideoMutation = trpc.addVideo.useMutation({
+    onSuccess: () => {
+      utils.getQueueStats.invalidate();
+    },
+  });
+
   function handleFetchNextPage() {
     fetchNextPage();
   }
@@ -48,6 +57,18 @@ export default function JobsList() {
       }
       return newSet;
     });
+  }
+
+  function handleRetryJob(rawJob: unknown) {
+    const jobParseResult = z
+      .object({ data: z.object({ url: z.string() }) })
+      .safeParse(rawJob);
+    if (!jobParseResult.success) {
+      console.error("Job does not have an ID", rawJob);
+      return;
+    }
+    const job = jobParseResult.data;
+    addVideoMutation.mutate({ url: job.data.url });
   }
 
   if (isLoading) {
@@ -100,24 +121,36 @@ export default function JobsList() {
                     </TooltipContent>
                   </Tooltip>
                   {isFailed && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => toggleJobExpansion(job.id)}
-                      className="flex items-center gap-1"
-                    >
-                      {isExpanded ? (
-                        <>
-                          <ChevronUp className="h-4 w-4" />
-                          Close
-                        </>
-                      ) : (
-                        <>
-                          <ChevronDown className="h-4 w-4" />
-                          Details
-                        </>
-                      )}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => toggleJobExpansion(job.id)}
+                        className="flex items-center gap-1"
+                      >
+                        {isExpanded ? (
+                          <>
+                            <ChevronUp className="h-4 w-4" />
+                            Close
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="h-4 w-4" />
+                            Details
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleRetryJob(job)}
+                        disabled={addVideoMutation.isPending}
+                        className="flex items-center gap-1"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        Retry
+                      </Button>
+                    </div>
                   )}
                 </div>
                 {isFailed && isExpanded && (

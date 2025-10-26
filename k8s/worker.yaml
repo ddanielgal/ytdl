@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ytdl-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ytdl
+      component: worker
+  template:
+    metadata:
+      labels:
+        app: ytdl
+        component: worker
+    spec:
+      containers:
+        - name: ytdl-worker
+          image: ytdl-worker:latest
+        envFrom:
+        - configMapRef:
+            name: ytdl-config
+        volumeMounts:
+        - name: data-volume
+          mountPath: /app/data
+      volumes:
+        - name: data-volume
+          persistentVolumeClaim:
+            claimName: ytdl-data-pvc

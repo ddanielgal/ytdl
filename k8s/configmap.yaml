@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ytdl-config
+  namespace: default
+data:
+  YTDLP_PATH: "/usr/local/bin/yt-dlp"
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"

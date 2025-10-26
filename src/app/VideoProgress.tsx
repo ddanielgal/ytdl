@@ -18,7 +18,7 @@ export default function VideoProgress() {
   const { url, title, messages } = useVideo();
   const [isExpanded, setIsExpanded] = useState(false);
 
-  trpc.videoProgress.useSubscription(
+  trpc.realtimeVideoProgress.useSubscription(
     { url },
     {
       onData: (data) => {

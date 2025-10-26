@@ -34,7 +34,6 @@ export default function RealtimeVideoAdderForm() {
         value={url}
         onChange={(event) => setUrl(event.target.value)}
         disabled={isPending}
-        placeholder="Enter YouTube URL..."
       />
       <Button type="submit" disabled={isPending}>
         {isPending ? "Adding..." : "Add Video"}

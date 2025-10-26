@@ -6,11 +6,11 @@ export default function QueueStatus() {
   const { data: queueStats, isLoading } = trpc.getQueueStats.useQuery();
 
   if (isLoading) {
-    return <div className="text-gray-500">Loading queue status...</div>;
+    return null;
   }
 
   if (!queueStats) {
-    return <div className="text-gray-500">No queue data available</div>;
+    return null;
   }
 
   const totalJobs =
@@ -20,7 +20,7 @@ export default function QueueStatus() {
     queueStats.failed;
 
   if (totalJobs === 0) {
-    return <div className="text-gray-500">No jobs in queue</div>;
+    return null;
   }
 
   return (

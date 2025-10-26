@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: ytdl-worker
-          image: ytdl-worker:latest
+          image: ddanielgal/ytdl-worker:latest
           envFrom:
             - configMapRef:
                 name: ytdl

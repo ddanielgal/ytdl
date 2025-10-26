@@ -15,11 +15,11 @@ spec:
       containers:
         - name: redis
           image: redis:7-alpine
-        ports:
-        - containerPort: 6379
-        volumeMounts:
-        - name: redis
-          mountPath: /data
+          ports:
+            - containerPort: 6379
+          volumeMounts:
+            - name: redis
+              mountPath: /data/redis
       volumes:
         - name: redis
           persistentVolumeClaim:

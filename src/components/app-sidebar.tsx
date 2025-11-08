@@ -20,6 +20,12 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { isMobile, setOpenMobile } = useSidebar();
 
+  const handleLinkClick = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
+
   return (
     <Sidebar>
       <SidebarHeader className="relative">
@@ -42,7 +48,7 @@ export function AppSidebar() {
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={pathname === "/"}>
-                  <Link href="/">
+                  <Link href="/" onClick={handleLinkClick}>
                     <ListVideo />
                     <span>Queue</span>
                   </Link>
@@ -50,7 +56,7 @@ export function AppSidebar() {
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={pathname === "/simple"}>
-                  <Link href="/simple">
+                  <Link href="/simple" onClick={handleLinkClick}>
                     <ArrowDownToLine />
                     <span>Simple</span>
                   </Link>

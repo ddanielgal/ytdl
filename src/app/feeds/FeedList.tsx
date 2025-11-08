@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { formatDistanceToNow } from "date-fns";
 import { trpc } from "~/trpc/client";
-import { Calendar, User, Download } from "lucide-react";
+import { Calendar, Radio, Download, Check } from "lucide-react";
 import { Button } from "~/components/ui/button";
 
 export default function FeedList() {
@@ -70,17 +71,13 @@ export default function FeedList() {
                   </h3>
                   <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                     <div className="flex items-center gap-1">
-                      <User className="h-4 w-4" />
+                      <Radio className="h-4 w-4" />
                       <span>{item.channelName}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Calendar className="h-4 w-4" />
                       <span>
-                        {uploadDate.toLocaleDateString("en-US", {
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                        })}
+                        {formatDistanceToNow(uploadDate, { addSuffix: true })}
                       </span>
                     </div>
                   </div>
@@ -89,11 +86,16 @@ export default function FeedList() {
                   const queueStatus = item.queueStatus;
                   const isAdding = addingVideoUrl === item.videoUrl;
 
-                  // Completed status: show "Downloaded" disabled button
+                  // Completed status: show "Downloaded" disabled button with checkmark
                   if (queueStatus === "completed") {
                     return (
-                      <Button disabled className="shrink-0" variant="secondary">
-                        <Download className="h-4 w-4" />
+                      <Button
+                        disabled
+                        size="sm"
+                        className="shrink-0"
+                        variant="secondary"
+                      >
+                        <Check className="h-4 w-4" />
                         <span className="hidden sm:inline ml-2">
                           Downloaded
                         </span>
@@ -108,7 +110,12 @@ export default function FeedList() {
                     queueStatus === "failed"
                   ) {
                     return (
-                      <Button disabled className="shrink-0" variant="secondary">
+                      <Button
+                        disabled
+                        size="sm"
+                        className="shrink-0"
+                        variant="secondary"
+                      >
                         <Download className="h-4 w-4" />
                         <span className="hidden sm:inline ml-2">
                           Downloading
@@ -125,8 +132,9 @@ export default function FeedList() {
                         addVideo({ url: item.videoUrl });
                       }}
                       disabled={isAdding}
+                      size="sm"
                       className="shrink-0"
-                      variant="default"
+                      variant="secondary"
                     >
                       <Download className="h-4 w-4" />
                       <span className="hidden sm:inline ml-2">

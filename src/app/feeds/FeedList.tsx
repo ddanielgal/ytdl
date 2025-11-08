@@ -3,7 +3,14 @@
 import { useState, useMemo } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { trpc } from "~/trpc/client";
-import { Calendar, Radio, Download, Check, RefreshCw } from "lucide-react";
+import {
+  Calendar,
+  Radio,
+  Download,
+  Check,
+  RefreshCw,
+  Clock,
+} from "lucide-react";
 import { Button } from "~/components/ui/button";
 import {
   Tooltip,
@@ -30,6 +37,20 @@ export default function FeedList() {
     trpc.getYoutubeFeed.useQuery({ channelId })
   );
 
+  // Format duration from seconds to HH:MM:SS or MM:SS
+  const formatDuration = (seconds: number | undefined): string => {
+    if (!seconds) return "";
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, "0")}:${secs
+        .toString()
+        .padStart(2, "0")}`;
+    }
+    return `${minutes}:${secs.toString().padStart(2, "0")}`;
+  };
+
   // Combine all results
   const allItems = useMemo(() => {
     const items: Array<{
@@ -38,6 +59,7 @@ export default function FeedList() {
       uploadDate: string;
       channelName: string;
       queueStatus: "waiting" | "active" | "completed" | "failed" | null;
+      duration?: number | undefined;
     }> = [];
 
     queries.forEach((query) => {
@@ -162,6 +184,12 @@ export default function FeedList() {
                           {formatDistanceToNow(uploadDate, { addSuffix: true })}
                         </span>
                       </div>
+                      {item.duration && (
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-4 w-4" />
+                          <span>{formatDuration(item.duration)}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   {(() => {

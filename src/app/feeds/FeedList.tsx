@@ -1,11 +1,24 @@
 "use client";
 
+import { useState } from "react";
 import { trpc } from "~/trpc/client";
-import Link from "next/link";
-import { ExternalLink, Calendar, User } from "lucide-react";
+import { Calendar, User, Download } from "lucide-react";
+import { Button } from "~/components/ui/button";
 
 export default function FeedList() {
   const { data, isLoading, error } = trpc.getYoutubeFeed.useQuery();
+  const [addingVideoUrl, setAddingVideoUrl] = useState<string | null>(null);
+  const utils = trpc.useUtils();
+  
+  const { mutate: addVideo } = trpc.addVideo.useMutation({
+    onSuccess: () => {
+      setAddingVideoUrl(null);
+      utils.getQueueStats.invalidate();
+    },
+    onError: () => {
+      setAddingVideoUrl(null);
+    },
+  });
 
   if (isLoading) {
     return (
@@ -78,15 +91,20 @@ export default function FeedList() {
                     </div>
                   </div>
                 </div>
-                <Link
-                  href={item.videoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-primary hover:underline shrink-0"
+                <Button
+                  onClick={() => {
+                    setAddingVideoUrl(item.videoUrl);
+                    addVideo({ url: item.videoUrl });
+                  }}
+                  disabled={addingVideoUrl === item.videoUrl}
+                  className="shrink-0"
+                  variant="default"
                 >
-                  <ExternalLink className="h-4 w-4" />
-                  <span className="hidden sm:inline">Watch</span>
-                </Link>
+                  <Download className="h-4 w-4" />
+                  <span className="hidden sm:inline ml-2">
+                    {addingVideoUrl === item.videoUrl ? "Adding..." : "Download"}
+                  </span>
+                </Button>
               </div>
             </div>
           );

@@ -6,10 +6,26 @@ import { observable } from "@trpc/server/observable";
 import { videoQueue } from "~/lib/queue";
 import YTDlpWrap from "yt-dlp-wrap-plus";
 import env from "~/env";
+import Parser from "rss-parser";
 
 const yt = new YTDlpWrap(env.YTDLP_PATH);
 
 const globalEmitter = new EventEmitter();
+
+const rssParser = new Parser();
+
+// Zod schema for YouTube RSS feed items
+const youtubeFeedItemSchema = z.object({
+  title: z.string(),
+  link: z.string().url(),
+  pubDate: z.string(),
+  author: z.string(),
+});
+
+const youtubeFeedSchema = z.object({
+  title: z.string(),
+  items: z.array(youtubeFeedItemSchema),
+});
 
 export const appRouter = createTRPCRouter({
   listVideos: baseProcedure.query(async () => {
@@ -239,6 +255,38 @@ export const appRouter = createTRPCRouter({
         totalJobs,
       };
     }),
+
+  getYoutubeFeed: baseProcedure.query(async () => {
+    const feedUrl =
+      "https://www.youtube.com/feeds/videos.xml?channel_id=UCsBjURrPoezykLs9EqgamOA";
+
+    const feed = await rssParser.parseURL(feedUrl);
+
+    // Extract channel name from feed title
+    const channelName = feed.title ?? "Unknown Channel";
+
+    // Parse and validate feed items
+    const feedItems = feed.items.map((item) => {
+      const parsed = youtubeFeedItemSchema.parse({
+        title: item.title ?? "",
+        link: item.link ?? "",
+        pubDate: item.pubDate ?? "",
+        author: item.author ?? channelName,
+      });
+
+      return {
+        title: parsed.title,
+        videoUrl: parsed.link,
+        uploadDate: parsed.pubDate,
+        channelName: parsed.author,
+      };
+    });
+
+    return {
+      channelName,
+      items: feedItems,
+    };
+  }),
 });
 
 export type AppRouter = typeof appRouter;

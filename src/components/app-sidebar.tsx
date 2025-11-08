@@ -1,6 +1,6 @@
 "use client";
 
-import { ListVideo, ArrowDownToLine, X } from "lucide-react";
+import { ListVideo, ArrowDownToLine, X, Rss } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -59,6 +59,14 @@ export function AppSidebar() {
                   <Link href="/simple" onClick={handleLinkClick}>
                     <ArrowDownToLine />
                     <span>Simple</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === "/feeds"}>
+                  <Link href="/feeds" onClick={handleLinkClick}>
+                    <Rss />
+                    <span>Feeds</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

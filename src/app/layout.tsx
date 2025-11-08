@@ -22,7 +22,7 @@ export default function RootLayout({
           <SidebarProvider defaultOpen={true}>
             <AppSidebar />
             <SidebarInset>
-              <header className="relative flex h-16 shrink-0 items-center gap-2 md:border-b pr-2 md:px-6">
+              <header className="relative flex h-16 shrink-0 items-center gap-2 pr-2 md:px-6">
                 <div className="flex flex-1 items-center justify-end">
                   <div className="absolute top-2 right-2 md:relative md:top-0 md:right-0">
                     <MobileSidebarTrigger />

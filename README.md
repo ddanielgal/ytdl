@@ -2,6 +2,8 @@
 
 Simple YouTube video downloader for Jellyfin.
 
+(docs somewhat outdated. I added a queue system which is not yet documented.)
+
 ## Usage
 
 The app looks like this: an input field and a button.
@@ -37,3 +39,8 @@ podman build -t ddanielgal/ytdl --platform linux/arm64/v8 .
 ```bash
 podman push ddanielgal/ytdl
 ```
+
+## Next up
+
+- Instant queueing
+- Cronjob channel auto-queuer

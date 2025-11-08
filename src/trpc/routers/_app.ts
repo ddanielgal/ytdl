@@ -348,50 +348,59 @@ export const appRouter = createTRPCRouter({
       }
 
       // Parse and validate feed items, enriching with queue status
-      const feedItems = feed.items.map((item) => {
-        // Extract video ID from RSS feed item
-        // Video ID can be found in item.id (format: "yt:video:VIDEO_ID") or extracted from URL
-        let videoId: string | undefined;
-        if (item.id) {
-          // Extract from "yt:video:VIDEO_ID" format
-          const match = item.id.match(/^yt:video:(.+)$/);
-          if (match) {
-            videoId = match[1];
+      // Filter out Shorts (videos with /shorts/ in the URL)
+      const feedItems = feed.items
+        .filter((item) => {
+          // Check if the link contains /shorts/ to filter out YouTube Shorts
+          if (item.link) {
+            return !item.link.includes("/shorts/");
           }
-        }
-        // Fallback: extract from URL if ID format doesn't work
-        if (!videoId && item.link) {
-          try {
-            const url = new URL(item.link);
-            videoId = url.searchParams.get("v") ?? undefined;
-          } catch {
-            // URL parsing failed, skip
+          return true; // Keep items without links (shouldn't happen, but be safe)
+        })
+        .map((item) => {
+          // Extract video ID from RSS feed item
+          // Video ID can be found in item.id (format: "yt:video:VIDEO_ID") or extracted from URL
+          let videoId: string | undefined;
+          if (item.id) {
+            // Extract from "yt:video:VIDEO_ID" format
+            const match = item.id.match(/^yt:video:(.+)$/);
+            if (match) {
+              videoId = match[1];
+            }
           }
-        }
+          // Fallback: extract from URL if ID format doesn't work
+          if (!videoId && item.link) {
+            try {
+              const url = new URL(item.link);
+              videoId = url.searchParams.get("v") ?? undefined;
+            } catch {
+              // URL parsing failed, skip
+            }
+          }
 
-        // Get duration from Invidious map
-        const duration = videoId ? durationsMap.get(videoId) : undefined;
+          // Get duration from Invidious map
+          const duration = videoId ? durationsMap.get(videoId) : undefined;
 
-        const parsed = youtubeFeedItemSchema.parse({
-          title: item.title ?? "",
-          link: item.link ?? "",
-          pubDate: item.pubDate ?? "",
-          author: item.author ?? channelName,
-          duration,
+          const parsed = youtubeFeedItemSchema.parse({
+            title: item.title ?? "",
+            link: item.link ?? "",
+            pubDate: item.pubDate ?? "",
+            author: item.author ?? channelName,
+            duration,
+          });
+
+          const normalizedFeedUrl = normalizeYoutubeUrl(parsed.link);
+          const queueStatus = urlToStatusMap.get(normalizedFeedUrl) ?? null;
+
+          return {
+            title: parsed.title,
+            videoUrl: parsed.link,
+            uploadDate: parsed.pubDate,
+            channelName: parsed.author,
+            queueStatus,
+            duration: parsed.duration,
+          };
         });
-
-        const normalizedFeedUrl = normalizeYoutubeUrl(parsed.link);
-        const queueStatus = urlToStatusMap.get(normalizedFeedUrl) ?? null;
-
-        return {
-          title: parsed.title,
-          videoUrl: parsed.link,
-          uploadDate: parsed.pubDate,
-          channelName: parsed.author,
-          queueStatus,
-          duration: parsed.duration,
-        };
-      });
 
       return {
         channelName,

@@ -80,7 +80,7 @@ export default function FeedList() {
   const isLoading = queries.some((q) => q.isLoading);
   const isFetching = queries.some((q) => q.isFetching);
   const hasError = queries.some((q) => q.error);
-  const loadedChannels = queries.filter((q) => q.isSuccess).length;
+  const loadedChannels = queries.filter((q) => !q.isFetching).length;
 
   const { mutate: addVideo } = trpc.addVideo.useMutation({
     onSuccess: () => {

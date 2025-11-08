@@ -76,8 +76,12 @@ export default function FeedList() {
                           {item.title}
                         </h3>
                       </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{item.title}</p>
+                      <TooltipContent
+                        className="max-w-[calc(100vw-2rem)] sm:max-w-md whitespace-normal break-words"
+                        side="top"
+                        align="center"
+                      >
+                        <p className="whitespace-normal">{item.title}</p>
                       </TooltipContent>
                     </Tooltip>
                     <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">

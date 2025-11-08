@@ -27,6 +27,23 @@ const youtubeFeedSchema = z.object({
   items: z.array(youtubeFeedItemSchema),
 });
 
+// Normalize YouTube URL for comparison (remove query parameters)
+function normalizeYoutubeUrl(url: string): string {
+  try {
+    const urlObj = new URL(url);
+    // Keep only the pathname and search params that matter (v parameter)
+    const videoId = urlObj.searchParams.get("v");
+    if (videoId) {
+      return `https://www.youtube.com/watch?v=${videoId}`;
+    }
+    // Fallback to base URL without query params
+    return `${urlObj.origin}${urlObj.pathname}`;
+  } catch {
+    // If URL parsing fails, return as-is
+    return url;
+  }
+}
+
 export const appRouter = createTRPCRouter({
   listVideos: baseProcedure.query(async () => {
     const folders = await fs.promises.readdir("data", {
@@ -265,7 +282,36 @@ export const appRouter = createTRPCRouter({
     // Extract channel name from feed title
     const channelName = feed.title ?? "Unknown Channel";
 
-    // Parse and validate feed items
+    // Get all jobs from the queue to match with feed items
+    const allJobs = await videoQueue.getJobs(
+      ["failed", "active", "wait", "completed"],
+      0,
+      -1 // Get all jobs
+    );
+
+    // Create a map of normalized URL -> status
+    const urlToStatusMap = new Map<
+      string,
+      "waiting" | "active" | "completed" | "failed"
+    >();
+
+    for (const job of allJobs) {
+      if (job.data && typeof job.data === "object" && "url" in job.data) {
+        const url = job.data.url as string;
+        const normalizedUrl = normalizeYoutubeUrl(url);
+        if (job.failedReason) {
+          urlToStatusMap.set(normalizedUrl, "failed");
+        } else if (job.finishedOn && !job.failedReason) {
+          urlToStatusMap.set(normalizedUrl, "completed");
+        } else if (job.processedOn && !job.finishedOn) {
+          urlToStatusMap.set(normalizedUrl, "active");
+        } else {
+          urlToStatusMap.set(normalizedUrl, "waiting");
+        }
+      }
+    }
+
+    // Parse and validate feed items, enriching with queue status
     const feedItems = feed.items.map((item) => {
       const parsed = youtubeFeedItemSchema.parse({
         title: item.title ?? "",
@@ -274,11 +320,15 @@ export const appRouter = createTRPCRouter({
         author: item.author ?? channelName,
       });
 
+      const normalizedFeedUrl = normalizeYoutubeUrl(parsed.link);
+      const queueStatus = urlToStatusMap.get(normalizedFeedUrl) ?? null;
+
       return {
         title: parsed.title,
         videoUrl: parsed.link,
         uploadDate: parsed.pubDate,
         channelName: parsed.author,
+        queueStatus,
       };
     });
 

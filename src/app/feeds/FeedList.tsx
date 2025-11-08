@@ -14,6 +14,7 @@ export default function FeedList() {
     onSuccess: () => {
       setAddingVideoUrl(null);
       utils.getQueueStats.invalidate();
+      utils.getYoutubeFeed.invalidate();
     },
     onError: () => {
       setAddingVideoUrl(null);
@@ -84,22 +85,56 @@ export default function FeedList() {
                     </div>
                   </div>
                 </div>
-                <Button
-                  onClick={() => {
-                    setAddingVideoUrl(item.videoUrl);
-                    addVideo({ url: item.videoUrl });
-                  }}
-                  disabled={addingVideoUrl === item.videoUrl}
-                  className="shrink-0"
-                  variant="default"
-                >
-                  <Download className="h-4 w-4" />
-                  <span className="hidden sm:inline ml-2">
-                    {addingVideoUrl === item.videoUrl
-                      ? "Adding..."
-                      : "Download"}
-                  </span>
-                </Button>
+                {(() => {
+                  const queueStatus = item.queueStatus;
+                  const isAdding = addingVideoUrl === item.videoUrl;
+
+                  // Completed status: show "Downloaded" disabled button
+                  if (queueStatus === "completed") {
+                    return (
+                      <Button disabled className="shrink-0" variant="secondary">
+                        <Download className="h-4 w-4" />
+                        <span className="hidden sm:inline ml-2">
+                          Downloaded
+                        </span>
+                      </Button>
+                    );
+                  }
+
+                  // Waiting, active, or failed status: show "Downloading" disabled button
+                  if (
+                    queueStatus === "waiting" ||
+                    queueStatus === "active" ||
+                    queueStatus === "failed"
+                  ) {
+                    return (
+                      <Button disabled className="shrink-0" variant="secondary">
+                        <Download className="h-4 w-4" />
+                        <span className="hidden sm:inline ml-2">
+                          Downloading
+                        </span>
+                      </Button>
+                    );
+                  }
+
+                  // Null status: show "Download" button (can be enqueued)
+                  return (
+                    <Button
+                      onClick={() => {
+                        setAddingVideoUrl(item.videoUrl);
+                        addVideo({ url: item.videoUrl });
+                      }}
+                      disabled={isAdding}
+                      className="shrink-0"
+                      variant="default"
+                    >
+                      <Download className="h-4 w-4" />
+                      <span className="hidden sm:inline ml-2">
+                        {isAdding ? "Adding..." : "Download"}
+                      </span>
+                    </Button>
+                  );
+                })()}
               </div>
             </div>
           );

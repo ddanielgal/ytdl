@@ -7,7 +7,6 @@ export default function FeedsPage() {
       <div className="flex w-full flex-col items-center">
         <main className="flex flex-col w-full max-w-4xl gap-4 md:gap-8">
           <section className="w-full">
-            <h1 className="text-2xl font-bold mb-4">YouTube RSS Feeds</h1>
             <FeedList />
           </section>
         </main>
@@ -15,4 +14,3 @@ export default function FeedsPage() {
     </HydrateClient>
   );
 }
-

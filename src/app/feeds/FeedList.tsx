@@ -9,7 +9,7 @@ export default function FeedList() {
   const { data, isLoading, error } = trpc.getYoutubeFeed.useQuery();
   const [addingVideoUrl, setAddingVideoUrl] = useState<string | null>(null);
   const utils = trpc.useUtils();
-  
+
   const { mutate: addVideo } = trpc.addVideo.useMutation({
     onSuccess: () => {
       setAddingVideoUrl(null);
@@ -48,13 +48,6 @@ export default function FeedList() {
 
   return (
     <div className="space-y-4">
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-2">{data.channelName}</h2>
-        <p className="text-sm text-muted-foreground">
-          {data.items.length} video{data.items.length !== 1 ? "s" : ""} found
-        </p>
-      </div>
-
       <div className="space-y-3">
         {data.items.map((item, index) => {
           let uploadDate: Date;
@@ -102,7 +95,9 @@ export default function FeedList() {
                 >
                   <Download className="h-4 w-4" />
                   <span className="hidden sm:inline ml-2">
-                    {addingVideoUrl === item.videoUrl ? "Adding..." : "Download"}
+                    {addingVideoUrl === item.videoUrl
+                      ? "Adding..."
+                      : "Download"}
                   </span>
                 </Button>
               </div>

@@ -273,70 +273,76 @@ export const appRouter = createTRPCRouter({
       };
     }),
 
-  getYoutubeFeed: baseProcedure.query(async () => {
-    const feedUrl =
-      "https://www.youtube.com/feeds/videos.xml?channel_id=UCsBjURrPoezykLs9EqgamOA";
+  getYoutubeFeed: baseProcedure
+    .input(
+      z.object({
+        channelId: z.string(),
+      })
+    )
+    .query(async (opts) => {
+      const { channelId } = opts.input;
+      const feedUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
 
-    const feed = await rssParser.parseURL(feedUrl);
+      const feed = await rssParser.parseURL(feedUrl);
 
-    // Extract channel name from feed title
-    const channelName = feed.title ?? "Unknown Channel";
+      // Extract channel name from feed title
+      const channelName = feed.title ?? "Unknown Channel";
 
-    // Get all jobs from the queue to match with feed items
-    const allJobs = await videoQueue.getJobs(
-      ["failed", "active", "wait", "completed"],
-      0,
-      -1 // Get all jobs
-    );
+      // Get all jobs from the queue to match with feed items
+      const allJobs = await videoQueue.getJobs(
+        ["failed", "active", "wait", "completed"],
+        0,
+        -1 // Get all jobs
+      );
 
-    // Create a map of normalized URL -> status
-    const urlToStatusMap = new Map<
-      string,
-      "waiting" | "active" | "completed" | "failed"
-    >();
+      // Create a map of normalized URL -> status
+      const urlToStatusMap = new Map<
+        string,
+        "waiting" | "active" | "completed" | "failed"
+      >();
 
-    for (const job of allJobs) {
-      if (job.data && typeof job.data === "object" && "url" in job.data) {
-        const url = job.data.url as string;
-        const normalizedUrl = normalizeYoutubeUrl(url);
-        if (job.failedReason) {
-          urlToStatusMap.set(normalizedUrl, "failed");
-        } else if (job.finishedOn && !job.failedReason) {
-          urlToStatusMap.set(normalizedUrl, "completed");
-        } else if (job.processedOn && !job.finishedOn) {
-          urlToStatusMap.set(normalizedUrl, "active");
-        } else {
-          urlToStatusMap.set(normalizedUrl, "waiting");
+      for (const job of allJobs) {
+        if (job.data && typeof job.data === "object" && "url" in job.data) {
+          const url = job.data.url as string;
+          const normalizedUrl = normalizeYoutubeUrl(url);
+          if (job.failedReason) {
+            urlToStatusMap.set(normalizedUrl, "failed");
+          } else if (job.finishedOn && !job.failedReason) {
+            urlToStatusMap.set(normalizedUrl, "completed");
+          } else if (job.processedOn && !job.finishedOn) {
+            urlToStatusMap.set(normalizedUrl, "active");
+          } else {
+            urlToStatusMap.set(normalizedUrl, "waiting");
+          }
         }
       }
-    }
 
-    // Parse and validate feed items, enriching with queue status
-    const feedItems = feed.items.map((item) => {
-      const parsed = youtubeFeedItemSchema.parse({
-        title: item.title ?? "",
-        link: item.link ?? "",
-        pubDate: item.pubDate ?? "",
-        author: item.author ?? channelName,
+      // Parse and validate feed items, enriching with queue status
+      const feedItems = feed.items.map((item) => {
+        const parsed = youtubeFeedItemSchema.parse({
+          title: item.title ?? "",
+          link: item.link ?? "",
+          pubDate: item.pubDate ?? "",
+          author: item.author ?? channelName,
+        });
+
+        const normalizedFeedUrl = normalizeYoutubeUrl(parsed.link);
+        const queueStatus = urlToStatusMap.get(normalizedFeedUrl) ?? null;
+
+        return {
+          title: parsed.title,
+          videoUrl: parsed.link,
+          uploadDate: parsed.pubDate,
+          channelName: parsed.author,
+          queueStatus,
+        };
       });
 
-      const normalizedFeedUrl = normalizeYoutubeUrl(parsed.link);
-      const queueStatus = urlToStatusMap.get(normalizedFeedUrl) ?? null;
-
       return {
-        title: parsed.title,
-        videoUrl: parsed.link,
-        uploadDate: parsed.pubDate,
-        channelName: parsed.author,
-        queueStatus,
+        channelName,
+        items: feedItems,
       };
-    });
-
-    return {
-      channelName,
-      items: feedItems,
-    };
-  }),
+    }),
 });
 
 export type AppRouter = typeof appRouter;

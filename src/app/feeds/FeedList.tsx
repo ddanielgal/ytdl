@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { trpc } from "~/trpc/client";
-import { Calendar, Radio, Download, Check } from "lucide-react";
+import { Calendar, Radio, Download, Check, RefreshCw } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import {
   Tooltip,
@@ -12,41 +12,87 @@ import {
   TooltipTrigger,
 } from "~/components/ui/tooltip";
 
+// Hardcoded channel IDs
+const CHANNEL_IDS = ["UCsBjURrPoezykLs9EqgamOA"]; // Fireship
+
 export default function FeedList() {
-  const { data, isLoading, error } = trpc.getYoutubeFeed.useQuery();
   const [addingVideoUrl, setAddingVideoUrl] = useState<string | null>(null);
   const utils = trpc.useUtils();
+
+  // Create queries for all channels
+  const queries = CHANNEL_IDS.map((channelId) =>
+    trpc.getYoutubeFeed.useQuery({ channelId })
+  );
+
+  // Combine all results
+  const allItems = useMemo(() => {
+    const items: Array<{
+      title: string;
+      videoUrl: string;
+      uploadDate: string;
+      channelName: string;
+      queueStatus: "waiting" | "active" | "completed" | "failed" | null;
+    }> = [];
+
+    queries.forEach((query) => {
+      if (query.data?.items) {
+        items.push(...query.data.items);
+      }
+    });
+
+    // Sort by date (newest first)
+    return items.sort((a, b) => {
+      const dateA = new Date(a.uploadDate).getTime();
+      const dateB = new Date(b.uploadDate).getTime();
+      return dateB - dateA;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queries.map((q) => q.data)]);
+
+  const isLoading = queries.some((q) => q.isLoading);
+  const hasError = queries.some((q) => q.error);
+  const loadedChannels = queries.filter((q) => q.data).length;
 
   const { mutate: addVideo } = trpc.addVideo.useMutation({
     onSuccess: () => {
       setAddingVideoUrl(null);
       utils.getQueueStats.invalidate();
-      utils.getYoutubeFeed.invalidate();
+      // Invalidate all channel queries
+      CHANNEL_IDS.forEach((channelId) => {
+        utils.getYoutubeFeed.invalidate({ channelId });
+      });
     },
     onError: () => {
       setAddingVideoUrl(null);
     },
   });
 
+  const handleRefresh = () => {
+    CHANNEL_IDS.forEach((channelId) => {
+      utils.getYoutubeFeed.invalidate({ channelId });
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="text-muted-foreground">Loading feed...</div>
+        <div className="text-muted-foreground">Loading feeds...</div>
       </div>
     );
   }
 
-  if (error) {
+  if (hasError) {
+    const firstError = queries.find((q) => q.error)?.error;
     return (
       <div className="flex items-center justify-center p-8">
         <div className="text-destructive">
-          Error loading feed: {error.message}
+          Error loading feeds: {firstError?.message ?? "Unknown error"}
         </div>
       </div>
     );
   }
 
-  if (!data || data.items.length === 0) {
+  if (allItems.length === 0) {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="text-muted-foreground">No feed items found.</div>
@@ -57,8 +103,22 @@ export default function FeedList() {
   return (
     <TooltipProvider>
       <div className="space-y-4">
+        <div className="flex justify-between items-center mb-4">
+          <div className="text-sm text-muted-foreground">
+            {loadedChannels}/{CHANNEL_IDS.length} channels
+          </div>
+          <Button
+            onClick={handleRefresh}
+            variant="outline"
+            size="sm"
+            disabled={isLoading}
+          >
+            <RefreshCw className="h-4 w-4" />
+            <span className="hidden sm:inline ml-2">Refresh</span>
+          </Button>
+        </div>
         <div className="space-y-3">
-          {data.items.map((item, index) => {
+          {allItems.map((item, index) => {
             let uploadDate: Date;
             try {
               uploadDate = new Date(item.uploadDate);

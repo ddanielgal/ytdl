@@ -13,7 +13,13 @@ import {
 } from "~/components/ui/tooltip";
 
 // Hardcoded channel IDs
-const CHANNEL_IDS = ["UCsBjURrPoezykLs9EqgamOA"]; // Fireship
+const CHANNEL_IDS = [
+  "UCsBjURrPoezykLs9EqgamOA", // Fireship
+  "UCsXVk37bltHxD1rDPwtNM8Q", // Kurzgesagt
+  "UCbRP3c757lWg9M-U7TyEkXA", // t3.gg
+  "UCAL3JXZSzSm8AlZyD3nQdBA", // Primitive Technology
+  "UC3XTzVzaHQEd30rQbuvCtTQ", // Last Week Tonight
+];
 
 export default function FeedList() {
   const [addingVideoUrl, setAddingVideoUrl] = useState<string | null>(null);

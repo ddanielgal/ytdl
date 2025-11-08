@@ -50,8 +50,9 @@ export default function FeedList() {
   }, [queries.map((q) => q.data)]);
 
   const isLoading = queries.some((q) => q.isLoading);
+  const isFetching = queries.some((q) => q.isFetching);
   const hasError = queries.some((q) => q.error);
-  const loadedChannels = queries.filter((q) => q.data).length;
+  const loadedChannels = queries.filter((q) => q.isSuccess).length;
 
   const { mutate: addVideo } = trpc.addVideo.useMutation({
     onSuccess: () => {
@@ -111,7 +112,7 @@ export default function FeedList() {
             onClick={handleRefresh}
             variant="outline"
             size="sm"
-            disabled={isLoading}
+            disabled={isFetching}
           >
             <RefreshCw className="h-4 w-4" />
             <span className="hidden sm:inline ml-2">Refresh</span>

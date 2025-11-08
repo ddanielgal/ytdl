@@ -20,7 +20,7 @@ export default function SimpleVideoAdderForm() {
   });
   return (
     <form
-      className="w-full flex gap-4"
+      className="w-full flex flex-col sm:flex-row gap-2 sm:gap-4"
       onSubmit={(event) => {
         if (isPending) {
           return;
@@ -34,8 +34,9 @@ export default function SimpleVideoAdderForm() {
         value={url}
         onChange={(event) => setUrl(event.target.value)}
         disabled={isPending}
+        className="flex-1"
       />
-      <Button type="submit" disabled={isPending}>
+      <Button type="submit" disabled={isPending} className="w-full sm:w-auto">
         {isPending ? "Adding..." : "Add Video"}
       </Button>
     </form>

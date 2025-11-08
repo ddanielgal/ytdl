@@ -113,8 +113,8 @@ export default function JobsList() {
             size="sm"
             disabled={isRefetching}
           >
-            <RefreshCw />
-            Refresh
+            <RefreshCw className="h-4 w-4" />
+            <span className="hidden sm:inline ml-2">Refresh</span>
           </Button>
         </div>
         <div className="space-y-2">
@@ -124,14 +124,14 @@ export default function JobsList() {
 
             return (
               <div key={job.id} className="border rounded-lg">
-                <div className="flex items-center gap-3 p-3">
-                  <Badge variant={isFailed ? "destructive" : "secondary"}>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 p-3">
+                  <Badge variant={isFailed ? "destructive" : "secondary"} className="shrink-0">
                     {job.status}
                   </Badge>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">
+                        <div className="font-medium truncate text-sm sm:text-base">
                           {job.data.uploader}: {job.data.title}
                         </div>
                       </div>
@@ -143,22 +143,22 @@ export default function JobsList() {
                     </TooltipContent>
                   </Tooltip>
                   {isFailed && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                       <Button
                         variant="secondary"
                         size="sm"
                         onClick={() => toggleJobExpansion(job.id)}
-                        className="flex items-center gap-1"
+                        className="flex items-center gap-1 flex-1 sm:flex-initial"
                       >
                         {isExpanded ? (
                           <>
                             <ChevronUp className="h-4 w-4" />
-                            Close
+                            <span className="hidden sm:inline">Close</span>
                           </>
                         ) : (
                           <>
                             <ChevronDown className="h-4 w-4" />
-                            Details
+                            <span className="hidden sm:inline">Details</span>
                           </>
                         )}
                       </Button>
@@ -167,20 +167,20 @@ export default function JobsList() {
                         size="sm"
                         onClick={() => handleRetryJob(job)}
                         disabled={retryJobMutation.isPending}
-                        className="flex items-center gap-1"
+                        className="flex items-center gap-1 flex-1 sm:flex-initial"
                       >
                         <RotateCcw className="h-4 w-4" />
-                        Retry
+                        <span className="hidden sm:inline">Retry</span>
                       </Button>
                       <Button
                         variant="secondary"
                         size="sm"
                         onClick={() => handleDeleteJob(job)}
                         disabled={deleteJobMutation.isPending}
-                        className="flex items-center gap-1"
+                        className="flex items-center gap-1 flex-1 sm:flex-initial"
                       >
                         <Trash2 className="h-4 w-4" />
-                        Delete
+                        <span className="hidden sm:inline">Delete</span>
                       </Button>
                     </div>
                   )}

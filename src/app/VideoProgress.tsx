@@ -32,9 +32,9 @@ export default function VideoProgress() {
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <div className="flex flex-col gap-2">
-            <CardTitle>{title}</CardTitle>
-            <CardDescription>{url}</CardDescription>
+          <div className="flex flex-col gap-2 min-w-0 flex-1 pr-2">
+            <CardTitle className="text-base sm:text-lg break-words">{title}</CardTitle>
+            <CardDescription className="text-xs sm:text-sm break-all">{url}</CardDescription>
           </div>
         </div>
       </CardHeader>
@@ -51,16 +51,16 @@ export default function VideoProgress() {
                 {isExpanded ? (
                   <>
                     <ChevronUp className="h-4 w-4" />
-                    Collapse
+                    <span className="hidden sm:inline">Collapse</span>
                   </>
                 ) : (
                   <>
                     <ChevronDown className="h-4 w-4" />
-                    Expand
+                    <span className="hidden sm:inline">Expand</span>
                   </>
                 )}
               </Button>
-              <div className="text-xs p-3 font-mono">
+              <div className="text-xs p-3 font-mono pr-20 sm:pr-24">
                 {(isExpanded ? messages : messages.slice(-5)).map(
                   (message, index) => (
                     <div

@@ -23,9 +23,12 @@ import {
 const CHANNEL_IDS = [
   "UCsBjURrPoezykLs9EqgamOA", // Fireship
   "UCsXVk37bltHxD1rDPwtNM8Q", // Kurzgesagt
-  "UCbRP3c757lWg9M-U7TyEkXA", // t3.gg
+  // "UCbRP3c757lWg9M-U7TyEkXA", // t3.gg
+  "UC9qpYwK7N9EB0-SECANa23g", // Jolvanezigy
   "UCAL3JXZSzSm8AlZyD3nQdBA", // Primitive Technology
   "UC3XTzVzaHQEd30rQbuvCtTQ", // Last Week Tonight
+  "UCi8C7TNs2ohrc6hnRQ5Sn2w", // Kai Lentit
+  "UCCgK6peZI5-FKDCWzMIFk2A", // Almost Friday TV
 ];
 
 export default function FeedList() {

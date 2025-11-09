@@ -2,7 +2,7 @@ import { HydrateClient } from "~/trpc/server";
 import SimpleVideoAdderForm from "./SimpleVideoAdderForm";
 import SimpleProgressList from "./SimpleProgressList";
 
-export default function SimplePage() {
+export default function DebugPage() {
   return (
     <HydrateClient>
       <div className="flex w-full flex-col items-center">
@@ -18,3 +18,4 @@ export default function SimplePage() {
     </HydrateClient>
   );
 }
+

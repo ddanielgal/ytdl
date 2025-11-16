@@ -28,12 +28,7 @@ export default function FeedDownloadButton({
   // Completed status: show "Downloaded" disabled button with checkmark
   if (queueStatus === "completed") {
     return (
-      <Button
-        disabled
-        size="sm"
-        className="shrink-0"
-        variant="secondary"
-      >
+      <Button disabled size="sm" className="shrink-0" variant="secondary">
         <Check className="h-4 w-4" />
         <span className="hidden sm:inline ml-2">Downloaded</span>
       </Button>
@@ -47,12 +42,7 @@ export default function FeedDownloadButton({
     queueStatus === "failed"
   ) {
     return (
-      <Button
-        disabled
-        size="sm"
-        className="shrink-0"
-        variant="secondary"
-      >
+      <Button disabled size="sm" className="shrink-0" variant="secondary">
         <Download className="h-4 w-4" />
         <span className="hidden sm:inline ml-2">Downloading</span>
       </Button>
@@ -77,4 +67,3 @@ export default function FeedDownloadButton({
     </Button>
   );
 }
-

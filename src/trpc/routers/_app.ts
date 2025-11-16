@@ -67,19 +67,11 @@ export const appRouter = createTRPCRouter({
     .mutation(async (opts) => {
       const { url } = opts.input;
 
-      const rawMetadata = await yt.getVideoInfo(url);
-      const metadata = z
-        .object({ title: z.string(), uploader: z.string() })
-        .parse(rawMetadata);
-
       const job = await videoQueue.add("download video", {
         url,
-        title: metadata.title,
-        uploader: metadata.uploader,
       });
 
       return {
-        metadata,
         jobId: job.id,
       };
     }),

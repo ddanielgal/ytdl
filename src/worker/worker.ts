@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { Worker, Job } from "bullmq";
 import YTDlpWrap from "yt-dlp-wrap-plus";
+import { z } from "zod";
 import env from "~/env";
 import { VideoJobData } from "~/lib/queue";
 
@@ -14,7 +15,36 @@ const redisConfig = {
 const worker = new Worker(
   "ytdl",
   async (job: Job<VideoJobData>) => {
-    const { url, title } = job.data;
+    const { url } = job.data;
+
+    // Fetch metadata if not already present
+    let title: string;
+    let uploader: string;
+
+    if (job.data.title && job.data.uploader) {
+      // Metadata already exists (shouldn't happen in normal flow, but handle gracefully)
+      title = job.data.title;
+      uploader = job.data.uploader;
+    } else {
+      // Fetch metadata
+      console.log(`Fetching metadata for: ${url}`);
+      const rawMetadata = await yt.getVideoInfo(url);
+      const metadata = z
+        .object({ title: z.string(), uploader: z.string() })
+        .parse(rawMetadata);
+
+      title = metadata.title;
+      uploader = metadata.uploader;
+
+      // Update job data with metadata
+      await job.updateData({
+        ...job.data,
+        title,
+        uploader,
+      });
+
+      console.log(`Metadata fetched: ${uploader} - ${title}`);
+    }
 
     console.log(`Starting download for: ${title} (${url})`);
 

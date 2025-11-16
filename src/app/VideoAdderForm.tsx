@@ -9,7 +9,7 @@ export default function VideoAdderForm() {
   const [url, setUrl] = useState("");
   const utils = trpc.useUtils();
   const { mutate: addVideo, isPending } = trpc.addVideo.useMutation({
-    onSuccess: ({ metadata, jobId }) => {
+    onSuccess: () => {
       setUrl("");
       utils.getQueueStats.invalidate();
     },

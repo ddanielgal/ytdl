@@ -125,20 +125,31 @@ export default function JobsList() {
             return (
               <div key={job.id} className="border rounded-lg">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 p-3">
-                  <Badge variant={isFailed ? "destructive" : "secondary"} className="shrink-0">
+                  <Badge
+                    variant={isFailed ? "destructive" : "secondary"}
+                    className="shrink-0"
+                  >
                     {job.status}
                   </Badge>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div className="flex-1 min-w-0">
                         <div className="font-medium truncate text-sm sm:text-base">
-                          {job.data.uploader}: {job.data.title}
+                          {job.data.title && job.data.uploader ? (
+                            `${job.data.uploader}: ${job.data.title}`
+                          ) : (
+                            <span className="text-muted-foreground">
+                              {job.data.url}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </TooltipTrigger>
                     <TooltipContent>
                       <p>
-                        {job.data.uploader}: {job.data.title}
+                        {job.data.title && job.data.uploader
+                          ? `${job.data.uploader}: ${job.data.title}`
+                          : job.data.url}
                       </p>
                     </TooltipContent>
                   </Tooltip>

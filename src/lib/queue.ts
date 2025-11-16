@@ -15,5 +15,6 @@ export const videoQueue = new Queue("ytdl", {
 
 export type VideoJobData = {
   url: string;
-  title: string;
+  title?: string;
+  uploader?: string;
 };

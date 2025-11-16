@@ -1,16 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { trpc } from "~/trpc/client";
-import {
-  Calendar,
-  Radio,
-  Download,
-  Check,
-  RefreshCw,
-  Clock,
-} from "lucide-react";
+import { Calendar, Radio, RefreshCw, Clock } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import {
   Tooltip,
@@ -18,6 +11,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
+import FeedDownloadButton from "~/components/FeedDownloadButton";
 
 // Hardcoded channel IDs
 const CHANNEL_IDS = [
@@ -32,7 +26,6 @@ const CHANNEL_IDS = [
 ];
 
 export default function FeedList() {
-  const [addingVideoUrl, setAddingVideoUrl] = useState<string | null>(null);
   const utils = trpc.useUtils();
 
   // Create queries for all channels
@@ -61,13 +54,20 @@ export default function FeedList() {
       videoUrl: string;
       uploadDate: string;
       channelName: string;
+      channelId: string;
       queueStatus: "waiting" | "active" | "completed" | "failed" | null;
       duration?: number | undefined;
     }> = [];
 
-    queries.forEach((query) => {
+    queries.forEach((query, index) => {
       if (query.data?.items) {
-        items.push(...query.data.items);
+        const channelId = CHANNEL_IDS[index];
+        items.push(
+          ...query.data.items.map((item) => ({
+            ...item,
+            channelId,
+          }))
+        );
       }
     });
 
@@ -83,20 +83,6 @@ export default function FeedList() {
   const isFetching = queries.some((q) => q.isFetching);
   const hasError = queries.some((q) => q.error);
   const loadedChannels = queries.filter((q) => !q.isFetching).length;
-
-  const { mutate: addVideo } = trpc.addVideo.useMutation({
-    onSuccess: () => {
-      setAddingVideoUrl(null);
-      utils.getQueueStats.invalidate();
-      // Invalidate all channel queries
-      CHANNEL_IDS.forEach((channelId) => {
-        utils.getYoutubeFeed.invalidate({ channelId });
-      });
-    },
-    onError: () => {
-      setAddingVideoUrl(null);
-    },
-  });
 
   const handleRefresh = () => {
     CHANNEL_IDS.forEach((channelId) => {
@@ -178,67 +164,11 @@ export default function FeedList() {
                       )}
                     </div>
                   </div>
-                  {(() => {
-                    const queueStatus = item.queueStatus;
-                    const isAdding = addingVideoUrl === item.videoUrl;
-
-                    // Completed status: show "Downloaded" disabled button with checkmark
-                    if (queueStatus === "completed") {
-                      return (
-                        <Button
-                          disabled
-                          size="sm"
-                          className="shrink-0"
-                          variant="secondary"
-                        >
-                          <Check className="h-4 w-4" />
-                          <span className="hidden sm:inline ml-2">
-                            Downloaded
-                          </span>
-                        </Button>
-                      );
-                    }
-
-                    // Waiting, active, or failed status: show "Downloading" disabled button
-                    if (
-                      queueStatus === "waiting" ||
-                      queueStatus === "active" ||
-                      queueStatus === "failed"
-                    ) {
-                      return (
-                        <Button
-                          disabled
-                          size="sm"
-                          className="shrink-0"
-                          variant="secondary"
-                        >
-                          <Download className="h-4 w-4" />
-                          <span className="hidden sm:inline ml-2">
-                            Downloading
-                          </span>
-                        </Button>
-                      );
-                    }
-
-                    // Null status: show "Download" button (can be enqueued)
-                    return (
-                      <Button
-                        onClick={() => {
-                          setAddingVideoUrl(item.videoUrl);
-                          addVideo({ url: item.videoUrl });
-                        }}
-                        disabled={isAdding}
-                        size="sm"
-                        className="shrink-0"
-                        variant="secondary"
-                      >
-                        <Download className="h-4 w-4" />
-                        <span className="hidden sm:inline ml-2">
-                          {isAdding ? "Adding..." : "Download"}
-                        </span>
-                      </Button>
-                    );
-                  })()}
+                  <FeedDownloadButton
+                    videoUrl={item.videoUrl}
+                    queueStatus={item.queueStatus}
+                    channelId={item.channelId}
+                  />
                 </div>
               </div>
             );

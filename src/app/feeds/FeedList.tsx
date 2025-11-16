@@ -80,7 +80,6 @@ export default function FeedList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queries.map((q) => q.data)]);
 
-  const isLoading = queries.some((q) => q.isLoading);
   const isFetching = queries.some((q) => q.isFetching);
   const hasError = queries.some((q) => q.error);
   const loadedChannels = queries.filter((q) => !q.isFetching).length;
@@ -105,14 +104,6 @@ export default function FeedList() {
     });
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-muted-foreground">Loading feeds...</div>
-      </div>
-    );
-  }
-
   if (hasError) {
     const firstError = queries.find((q) => q.error)?.error;
     return (
@@ -120,14 +111,6 @@ export default function FeedList() {
         <div className="text-destructive">
           Error loading feeds: {firstError?.message ?? "Unknown error"}
         </div>
-      </div>
-    );
-  }
-
-  if (allItems.length === 0) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-muted-foreground">No feed items found.</div>
       </div>
     );
   }

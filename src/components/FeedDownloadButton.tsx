@@ -10,6 +10,20 @@ interface FeedDownloadButtonProps {
   channelId: string;
 }
 
+// Normalize YouTube URL for comparison (same logic as in router)
+function normalizeYoutubeUrl(url: string): string {
+  try {
+    const urlObj = new URL(url);
+    const videoId = urlObj.searchParams.get("v");
+    if (videoId) {
+      return `https://www.youtube.com/watch?v=${videoId}`;
+    }
+    return `${urlObj.origin}${urlObj.pathname}`;
+  } catch {
+    return url;
+  }
+}
+
 export default function FeedDownloadButton({
   videoUrl,
   queueStatus,
@@ -18,9 +32,45 @@ export default function FeedDownloadButton({
   const utils = trpc.useUtils();
 
   const { mutate: addVideo, isPending } = trpc.addVideo.useMutation({
+    onMutate: async () => {
+      // Cancel any outgoing refetches
+      await utils.getYoutubeFeed.cancel({ channelId });
+
+      // Snapshot the previous value
+      const previousData = utils.getYoutubeFeed.getData({ channelId });
+
+      // Optimistically update the cache
+      utils.getYoutubeFeed.setData({ channelId }, (old) => {
+        if (!old) return old;
+
+        const normalizedVideoUrl = normalizeYoutubeUrl(videoUrl);
+        return {
+          ...old,
+          items: old.items.map((item) => {
+            const normalizedItemUrl = normalizeYoutubeUrl(item.videoUrl);
+            if (normalizedItemUrl === normalizedVideoUrl) {
+              return {
+                ...item,
+                queueStatus: "waiting" as const,
+              };
+            }
+            return item;
+          }),
+        };
+      });
+
+      // Return context with the previous value
+      return { previousData };
+    },
+    onError: (err, variables, context) => {
+      // If the mutation fails, use the context returned from onMutate to roll back
+      if (context?.previousData) {
+        utils.getYoutubeFeed.setData({ channelId }, context.previousData);
+      }
+    },
     onSuccess: () => {
       utils.getQueueStats.invalidate();
-      // Only invalidate the specific channel's feed query
+      // Invalidate to get the real status from the queue
       utils.getYoutubeFeed.invalidate({ channelId });
     },
   });

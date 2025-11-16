@@ -40,7 +40,15 @@ podman build -t ddanielgal/ytdl --platform linux/arm64/v8 .
 podman push ddanielgal/ytdl
 ```
 
+```bash
+podman build -f Dockerfile.worker -t ddanielgal/ytdl-worker --platform linux/arm64/v8 .
+```
+
+```bash
+podman push ddanielgal/ytdl-worker
+```
+
 ## Next up
 
-- Instant queueing
-- Cronjob channel auto-queuer
+- [x] Instant queueing
+- [ ] Cronjob channel auto-queuer

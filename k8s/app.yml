@@ -31,13 +31,6 @@ spec:
           envFrom:
             - configMapRef:
                 name: ytdl
-          volumeMounts:
-            - name: ytdl
-              mountPath: /app/data
-      volumes:
-        - name: ytdl
-          persistentVolumeClaim:
-            claimName: ytdl
 ---
 apiVersion: v1
 kind: Service

@@ -28,7 +28,11 @@ const worker = new Worker(
     } else {
       // Fetch metadata
       console.log(`Fetching metadata for: ${url}`);
-      const rawMetadata = await yt.getVideoInfo(url);
+      const rawMetadata = await yt.getVideoInfo([
+        url,
+        "--cookies",
+        env.YTDLP_COOKIES_PATH,
+      ]);
       const metadata = z
         .object({ title: z.string(), uploader: z.string() })
         .parse(rawMetadata);
@@ -49,6 +53,8 @@ const worker = new Worker(
     console.log(`Starting download for: ${title} (${url})`);
 
     const downloadEmitter = yt.exec([
+      "--cookies",
+      env.YTDLP_COOKIES_PATH,
       "-f",
       "bv*[height<=1080]+ba/b",
       "--write-info-json",
@@ -60,8 +66,10 @@ const worker = new Worker(
       "--convert-subs",
       "srt",
       "--ignore-errors",
+      "--sleep-interval",
+      "2",
       "--extractor-args",
-      "youtube:player_js_version=actual",
+      "youtube:player_client=tv;player_js_version=actual",
       "--js-runtimes",
       "node",
       "--output",

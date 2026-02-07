@@ -4,6 +4,7 @@ metadata:
   name: ytdl
 data:
   YTDLP_PATH: "/usr/local/bin/yt-dlp"
+  YTDLP_COOKIES_PATH: "/etc/ytdl/cookies.txt"
   REDIS_HOST: "redis"
   REDIS_PORT: "6379"
 ---

@@ -24,7 +24,13 @@ spec:
           volumeMounts:
             - name: ytdlq
               mountPath: /app/data
+            - name: ytdl-cookies
+              mountPath: /etc/ytdl
+              readOnly: true
       volumes:
         - name: ytdlq
           persistentVolumeClaim:
             claimName: ytdlq
+        - name: ytdl-cookies
+          secret:
+            secretName: ytdl-cookies

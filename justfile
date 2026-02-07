@@ -1,5 +1,8 @@
+list:
+    just -l
+
 build:
-    podman build --network host -t pi.home:30500/ddanielgal/ytdl --platform linux/arm64/v8 .
+    podman build --network host --jobs 4 -t pi.home:30500/ddanielgal/ytdl --platform linux/arm64/v8 .
 
 push:
     podman push pi.home:30500/ddanielgal/ytdl

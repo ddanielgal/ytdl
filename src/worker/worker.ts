@@ -1,4 +1,3 @@
-import "dotenv/config";
 import { Worker, Job } from "bullmq";
 import YTDlpWrap from "yt-dlp-wrap-plus";
 import { z } from "zod";

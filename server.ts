@@ -17,14 +17,18 @@ const tRPCHandler = (req: Request) =>
     createContext: createTRPCContext,
   });
 
+const isDev = process.env.NODE_ENV !== "production";
+
 serve({
   port: process.env.PORT ? parseInt(process.env.PORT, 10) : 3000,
-  development: process.env.NODE_ENV !== "production",
+  development: isDev
+    ? { hmr: true, console: true }
+    : false,
   routes: {
     [BASE_PATH]: indexHtml,
     [`${BASE_PATH}/`]: indexHtml,
   },
-  async fetch(req) {
+  async fetch(req: Request) {
     const url = new URL(req.url);
     const pathname = url.pathname;
 
@@ -35,10 +39,8 @@ serve({
 
     // SPA: any other path under basePath serves the shell (client-side routing)
     if (pathname === BASE_PATH || pathname.startsWith(BASE_PATH + "/")) {
-      if (indexHtml instanceof Response) return indexHtml;
-      return new Response(indexHtml, {
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-      });
+      if (indexHtml instanceof Response) return indexHtml.clone();
+      return new Response(indexHtml, { headers: { "Content-Type": "text/html; charset=utf-8" } });
     }
 
     return new Response("Not Found", { status: 404 });

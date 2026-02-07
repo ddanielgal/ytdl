@@ -28,11 +28,7 @@ const worker = new Worker(
     } else {
       // Fetch metadata
       console.log(`Fetching metadata for: ${url}`);
-      const rawMetadata = await yt.getVideoInfo([
-        url,
-        "--cookies",
-        env.YTDLP_COOKIES_PATH,
-      ]);
+      const rawMetadata = await yt.getVideoInfo([url]);
       const metadata = z
         .object({ title: z.string(), uploader: z.string() })
         .parse(rawMetadata);

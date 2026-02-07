@@ -17,7 +17,7 @@ spec:
       containers:
         - name: ytdl-worker
           image: pi.home:30500/ddanielgal/ytdl:latest
-          command: ["npx", "tsx", "src/worker/worker.ts"]
+          command: ["./ytdl-worker"]
           envFrom:
             - configMapRef:
                 name: ytdl

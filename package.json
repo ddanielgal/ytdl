@@ -7,7 +7,7 @@
     "build": "bun build.ts",
     "start": "./ytdl",
     "lint": "eslint .",
-    "worker": "bun src/worker/worker.ts",
+    "worker": "./ytdl-worker",
     "worker:dev": "bun --watch src/worker/worker.ts"
   },
   "dependencies": {

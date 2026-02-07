@@ -24,8 +24,9 @@ ENV UV_TOOL_BIN_DIR=/usr/local/bin
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv tool install 'yt-dlp[default,curl_cffi]'
 
-# App: single binary (frontend assets embedded via --compile)
+# App: compiled binaries (frontend assets embedded in server via --compile)
 COPY --from=build /app/ytdl /app/ytdl
+COPY --from=build /app/ytdl-worker /app/ytdl-worker
 
 ENV NODE_ENV=production
 EXPOSE 3000

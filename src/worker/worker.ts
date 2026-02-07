@@ -1,5 +1,5 @@
 import { Worker, Job } from "bullmq";
-import YTDlpWrap from "yt-dlp-wrap-plus";
+const YTDlpWrap = require("yt-dlp-wrap-plus").default;
 import { z } from "zod";
 import env from "~/env";
 import { VideoJobData } from "~/lib/queue";

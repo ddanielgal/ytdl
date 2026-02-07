@@ -9,6 +9,7 @@
 # production
 /build
 /ytdl
+/ytdl-worker
 
 # npm lockfile (project uses bun)
 package-lock.json

@@ -15,14 +15,14 @@ upgrade:
 dev:
     npx concurrently --kill-others --names redis,app,worker \
         "podman run --rm --replace --name ytdl-redis -p 6379:6379 redis:7-alpine" \
-        "npm run dev" \
-        "npm run worker:dev"
+        "bun run dev" \
+        "bun run worker:dev"
 
 dev-redis:
     podman run --rm --replace --name ytdl-redis -p 6379:6379 redis:7-alpine
 
 dev-worker:
-    npm run worker:dev
+    bun run worker:dev
 
 dev-app:
-    npm run dev
+    bun run dev

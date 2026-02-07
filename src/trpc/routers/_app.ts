@@ -285,35 +285,6 @@ export const appRouter = createTRPCRouter({
       // Extract channel name from feed title
       const channelName = feed.title ?? "Unknown Channel";
 
-      // Fetch video durations from Invidious API
-      // Using a public Invidious instance (you may want to make this configurable)
-      const invidiousInstanceUrl = "https://inv.perditum.com";
-      const durationsMap = new Map<string, number>();
-
-      try {
-        const invidiousResponse = await fetch(
-          `${invidiousInstanceUrl}/api/v1/channels/${channelId}?&fields=latestVideos`,
-        );
-
-        if (invidiousResponse.ok) {
-          const invidiousData = (await invidiousResponse.json()) as {
-            latestVideos?: Array<{
-              videoId: string;
-              lengthSeconds: number;
-            }>;
-          };
-
-          if (invidiousData.latestVideos) {
-            for (const video of invidiousData.latestVideos) {
-              durationsMap.set(video.videoId, video.lengthSeconds);
-            }
-          }
-        }
-      } catch (error) {
-        // Silently fail if Invidious is unavailable - duration is optional
-        console.warn("Failed to fetch durations from Invidious:", error);
-      }
-
       // Get all jobs from the queue to match with feed items
       const allJobs = await videoQueue.getJobs(
         ["failed", "active", "wait", "completed"],
@@ -354,35 +325,11 @@ export const appRouter = createTRPCRouter({
           return true; // Keep items without links (shouldn't happen, but be safe)
         })
         .map((item) => {
-          // Extract video ID from RSS feed item
-          // Video ID can be found in item.id (format: "yt:video:VIDEO_ID") or extracted from URL
-          let videoId: string | undefined;
-          if (item.id) {
-            // Extract from "yt:video:VIDEO_ID" format
-            const match = item.id.match(/^yt:video:(.+)$/);
-            if (match) {
-              videoId = match[1];
-            }
-          }
-          // Fallback: extract from URL if ID format doesn't work
-          if (!videoId && item.link) {
-            try {
-              const url = new URL(item.link);
-              videoId = url.searchParams.get("v") ?? undefined;
-            } catch {
-              // URL parsing failed, skip
-            }
-          }
-
-          // Get duration from Invidious map
-          const duration = videoId ? durationsMap.get(videoId) : undefined;
-
           const parsed = youtubeFeedItemSchema.parse({
             title: item.title ?? "",
             link: item.link ?? "",
             pubDate: item.pubDate ?? "",
             author: item.author ?? channelName,
-            duration,
           });
 
           const normalizedFeedUrl = normalizeYoutubeUrl(parsed.link);

@@ -68,6 +68,8 @@ const worker = new Worker(
       "--ignore-errors",
       "--sleep-interval",
       "2",
+      "--js-runtimes",
+      "node",
       "--output",
       "data/videos/%(uploader)s/%(upload_date>%Y)s/%(upload_date)s %(title)s/%(title)s.%(ext)s",
       url,

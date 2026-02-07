@@ -13,9 +13,9 @@ upgrade:
 
 # Run the full dev environment (app + redis + worker)
 dev:
-    npx concurrently --kill-others --names app,redis,worker --prefix-colors blue,red,green \
-        "npm run dev" \
+    npx concurrently --kill-others --names redis,app,worker \
         "podman run --rm --replace --name ytdl-redis -p 6379:6379 redis:7-alpine" \
+        "npm run dev" \
         "npm run worker:dev"
 
 dev-redis:

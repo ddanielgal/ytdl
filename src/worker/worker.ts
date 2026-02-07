@@ -62,6 +62,8 @@ const worker = new Worker(
       "--ignore-errors",
       "--extractor-args",
       "youtube:player_js_version=actual",
+      "--js-runtimes",
+      "node",
       "--output",
       "data/videos/%(uploader)s/%(upload_date>%Y)s/%(upload_date)s %(title)s/%(title)s.%(ext)s",
       url,
@@ -103,7 +105,7 @@ const worker = new Worker(
   {
     connection: redisConfig,
     concurrency: 1,
-  }
+  },
 );
 
 console.log("Worker started and listening for jobs...");

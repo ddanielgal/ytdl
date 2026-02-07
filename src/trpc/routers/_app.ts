@@ -52,7 +52,7 @@ export const appRouter = createTRPCRouter({
       recursive: true,
     });
     const videos = folders.filter(
-      (folder) => folder.isDirectory() && folder.parentPath !== "data"
+      (folder) => folder.isDirectory() && folder.parentPath !== "data",
     );
 
     return videos;
@@ -62,7 +62,7 @@ export const appRouter = createTRPCRouter({
     .input(
       z.object({
         url: z.string(),
-      })
+      }),
     )
     .mutation(async (opts) => {
       const { url } = opts.input;
@@ -80,7 +80,7 @@ export const appRouter = createTRPCRouter({
     .input(
       z.object({
         url: z.string(),
-      })
+      }),
     )
     .mutation(async (opts) => {
       const { url } = opts.input;
@@ -104,6 +104,8 @@ export const appRouter = createTRPCRouter({
         "--ignore-errors",
         "--extractor-args",
         "youtube:player_js_version=actual",
+        "--js-runtimes",
+        "node",
         "--output",
         "data/videos/%(uploader)s/%(upload_date>%Y)s/%(upload_date)s %(title)s/%(title)s.%(ext)s",
         url,
@@ -149,7 +151,7 @@ export const appRouter = createTRPCRouter({
     .input(
       z.object({
         url: z.string(),
-      })
+      }),
     )
     .subscription((opts) => {
       const { url } = opts.input;
@@ -174,7 +176,7 @@ export const appRouter = createTRPCRouter({
     .input(
       z.object({
         jobId: z.string(),
-      })
+      }),
     )
     .mutation(async ({ input }) => {
       const { jobId } = input;
@@ -197,7 +199,7 @@ export const appRouter = createTRPCRouter({
       z.object({
         limit: z.number().min(1).default(20),
         cursor: z.number().nullish(),
-      })
+      }),
     )
     .query(async ({ input }) => {
       const { limit, cursor } = input;
@@ -208,7 +210,7 @@ export const appRouter = createTRPCRouter({
         ["failed", "active", "wait", "completed"],
         start,
         end,
-        false // desc order
+        false, // desc order
       );
 
       const jobs = allJobs.map((job) => {
@@ -251,7 +253,7 @@ export const appRouter = createTRPCRouter({
         "wait",
         "active",
         "completed",
-        "failed"
+        "failed",
       );
 
       const totalJobs =
@@ -270,7 +272,7 @@ export const appRouter = createTRPCRouter({
     .input(
       z.object({
         channelId: z.string(),
-      })
+      }),
     )
     .query(async (opts) => {
       const { channelId } = opts.input;
@@ -288,7 +290,7 @@ export const appRouter = createTRPCRouter({
 
       try {
         const invidiousResponse = await fetch(
-          `${invidiousInstanceUrl}/api/v1/channels/${channelId}?&fields=latestVideos`
+          `${invidiousInstanceUrl}/api/v1/channels/${channelId}?&fields=latestVideos`,
         );
 
         if (invidiousResponse.ok) {
@@ -314,7 +316,7 @@ export const appRouter = createTRPCRouter({
       const allJobs = await videoQueue.getJobs(
         ["failed", "active", "wait", "completed"],
         0,
-        -1 // Get all jobs
+        -1, // Get all jobs
       );
 
       // Create a map of normalized URL -> status

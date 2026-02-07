@@ -1,6 +1,6 @@
 "use client";
 
-import { ListVideo, Bug, X, Rss } from "lucide-react";
+import { ListVideo, X, Rss } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -59,14 +59,6 @@ export function AppSidebar() {
                   <Link href="/queue" onClick={handleLinkClick}>
                     <ListVideo />
                     <span>Queue</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === "/debug"}>
-                  <Link href="/debug" onClick={handleLinkClick}>
-                    <Bug />
-                    <span>Debug</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

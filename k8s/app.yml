@@ -3,7 +3,7 @@ kind: ConfigMap
 metadata:
   name: ytdl
 data:
-  YTDLP_PATH: "/app/bin/yt-dlp"
+  YTDLP_PATH: "/usr/local/bin/yt-dlp"
   REDIS_HOST: "redis"
   REDIS_PORT: "6379"
 ---

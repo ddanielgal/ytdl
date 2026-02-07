@@ -3,7 +3,6 @@ import { TRPCProvider } from "~/trpc/client";
 import { AppSidebar } from "~/components/app-sidebar";
 import { SidebarProvider, SidebarInset } from "~/components/ui/sidebar";
 import { MobileSidebarTrigger } from "~/components/mobile-sidebar-trigger";
-import { HomePage } from "~/pages/Home";
 import { QueuePage } from "~/pages/Queue";
 import { FeedsPage } from "~/pages/Feeds";
 
@@ -23,9 +22,8 @@ export function App() {
             </header>
             <div className="flex flex-1 flex-col gap-4 p-4 md:p-6 md:gap-6">
               <Routes>
-                <Route path="/" element={<HomePage />} />
+                <Route path="/" element={<FeedsPage />} />
                 <Route path="/queue" element={<QueuePage />} />
-                <Route path="/feeds" element={<FeedsPage />} />
               </Routes>
             </div>
           </SidebarInset>

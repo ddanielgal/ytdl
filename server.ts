@@ -25,7 +25,10 @@ serve({
   routes: {
     [BASE_PATH]: indexHtml,
     [`${BASE_PATH}/`]: indexHtml,
+    [`${BASE_PATH}/queue`]: indexHtml,
+    [`${BASE_PATH}/queue/`]: indexHtml,
   },
+
   fetch(req: Request) {
     const url = new URL(req.url);
     const pathname = url.pathname;
@@ -33,13 +36,6 @@ serve({
     // tRPC API
     if (pathname.startsWith(TRPC_PREFIX)) {
       return tRPCHandler(req);
-    }
-
-    // SPA fallback: paths under basePath not matched by routes (e.g. /ytdl/downloads) get the same shell (client-side routing)
-    if (pathname.startsWith(BASE_PATH + "/")) {
-      return new Response(indexHtml.index, {
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-      });
     }
 
     return new Response("Not Found", { status: 404 });

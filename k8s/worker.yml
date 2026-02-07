@@ -24,12 +24,12 @@ spec:
           volumeMounts:
             - name: ytdlq
               mountPath: /app/data
-            - name: ytdl-cookies
+            - name: ytdl-config
               mountPath: /etc/ytdl
       volumes:
         - name: ytdlq
           persistentVolumeClaim:
             claimName: ytdlq
-        - name: ytdl-cookies
-          secret:
-            secretName: ytdl-cookies
+        - name: ytdl-config
+          persistentVolumeClaim:
+            claimName: ytdl-config

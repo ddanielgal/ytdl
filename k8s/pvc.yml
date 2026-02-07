@@ -12,6 +12,17 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
+  name: ytdl-config
+spec:
+  storageClassName: nfs-storage
+  accessModes: [ReadWriteMany]
+  resources:
+    requests:
+      storage: 100Mi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
   name: redis
 spec:
   storageClassName: nfs-storage

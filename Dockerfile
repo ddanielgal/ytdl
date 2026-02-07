@@ -7,7 +7,7 @@ COPY package.json bun.lock* ./
 RUN bun install
 
 COPY . .
-RUN bun build --compile --minify --target=bun --outfile=ytdl ./server.ts
+RUN bun run build
 
 # --- Stage 2: Runtime ---
 FROM oven/bun:1-slim AS runner
@@ -24,9 +24,8 @@ ENV UV_TOOL_BIN_DIR=/usr/local/bin
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv tool install 'yt-dlp[default,curl_cffi]'
 
-# App: single binary + static assets
+# App: single binary (frontend assets embedded via --compile)
 COPY --from=build /app/ytdl /app/ytdl
-COPY --from=build /app/public ./public
 
 ENV NODE_ENV=production
 EXPOSE 3000

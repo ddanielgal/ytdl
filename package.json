@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "bun --hot server.ts",
-    "build": "bun build --compile --outfile=ytdl ./server.ts",
+    "build": "bun build.ts",
     "start": "./ytdl",
     "lint": "eslint .",
     "worker": "bun src/worker/worker.ts",
@@ -21,7 +21,6 @@
     "@trpc/react-query": "^11.0.0-rc.502",
     "@trpc/server": "^11.0.0-rc.502",
     "bullmq": "^5.61.2",
-    "bun-plugin-tailwind": "^0.1.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
@@ -41,6 +40,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9",
+    "bun-plugin-tailwind": "^0.1.0",
     "bun-types": "latest",
     "@types/node": "^22",
     "@types/react": "^19",

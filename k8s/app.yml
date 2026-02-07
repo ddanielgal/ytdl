@@ -25,7 +25,7 @@ spec:
     spec:
       containers:
         - name: ytdl
-          image: ddanielgal/ytdl:latest
+          image: pi.home:30500/ddanielgal/ytdl:latest
           ports:
             - containerPort: 3000
           envFrom:

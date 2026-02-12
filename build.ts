@@ -1,4 +1,7 @@
 import tailwindcss from "bun-plugin-tailwind";
+import { mkdir } from "fs/promises";
+
+await mkdir("./dist", { recursive: true });
 
 const server = await Bun.build({
   entrypoints: ["./server.ts"],
@@ -6,7 +9,7 @@ const server = await Bun.build({
   minify: true,
   plugins: [tailwindcss],
   compile: {
-    outfile: "./ytdl",
+    outfile: "./dist/ytdl",
   },
 });
 
@@ -23,7 +26,7 @@ const worker = await Bun.build({
   target: "bun",
   minify: true,
   compile: {
-    outfile: "./ytdl-worker",
+    outfile: "./dist/ytdl-worker",
   },
 });
 

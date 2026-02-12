@@ -5,9 +5,9 @@
   "scripts": {
     "dev": "bun --hot server.ts",
     "build": "bun build.ts",
-    "start": "./ytdl",
+    "start": "./dist/ytdl",
     "lint": "eslint .",
-    "worker": "./ytdl-worker",
+    "worker": "./dist/ytdl-worker",
     "worker:dev": "bun --watch src/worker/worker.ts"
   },
   "dependencies": {

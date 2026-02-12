@@ -6,10 +6,8 @@
 # testing
 /coverage
 
-# production
-/build
-/ytdl
-/ytdl-worker
+# production (build output)
+/dist
 
 # npm lockfile (project uses bun)
 package-lock.json

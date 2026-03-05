@@ -26,3 +26,18 @@ dev-worker:
 
 dev-app:
     bun run dev
+
+# Build the container image for local testing
+build-local:
+    podman build --network host --jobs 4 -t localhost/ytdl:latest .
+
+# Start the full stack via podman kube play (app + worker + redis)
+pod-up:
+    podman kube play podman-kube.yml
+
+# Tear down the pod
+pod-down:
+    podman kube down podman-kube.yml
+
+# Rebuild image and restart the pod
+pod-restart: build-local pod-down pod-up

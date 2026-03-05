@@ -41,7 +41,7 @@ spec:
         - name: data
           mountPath: /app/data
         - name: cookies
-          mountPath: /etc/ytdl
+          mountPath: /etc/ytdl/cookies.txt
 
   volumes:
     - name: data

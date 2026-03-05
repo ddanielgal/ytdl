@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # --- Stage 1: Build (deps + compile) ---
-FROM oven/bun:1 AS build
+FROM docker.io/oven/bun:1 AS build
 WORKDIR /app
 
 COPY package.json bun.lock* ./
@@ -10,7 +10,7 @@ COPY . .
 RUN bun run build
 
 # --- Stage 2: Runtime ---
-FROM oven/bun:1-slim AS runner
+FROM docker.io/oven/bun:1-slim AS runner
 WORKDIR /app
 
 # ffmpeg (system package)

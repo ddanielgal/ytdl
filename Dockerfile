@@ -10,13 +10,14 @@ COPY . .
 RUN bun run build
 
 # --- Stage 2: Runtime ---
-FROM docker.io/oven/bun:1-slim AS runner
+FROM docker.io/library/debian:bookworm-slim AS runner
 WORKDIR /app
 
 # ffmpeg (system package)
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends ffmpeg
+    apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
 # uv + yt-dlp with curl-cffi
 COPY --from=ghcr.io/astral-sh/uv:0.10 /uv /usr/local/bin/uv

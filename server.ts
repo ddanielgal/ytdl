@@ -33,6 +33,10 @@ serve({
     const url = new URL(req.url);
     const pathname = url.pathname;
 
+    if (pathname === BASE_PATH) {
+      return Response.redirect(`${url.origin}${BASE_PATH}/`, 308);
+    }
+
     // tRPC API
     if (pathname.startsWith(TRPC_PREFIX)) {
       return tRPCHandler(req);

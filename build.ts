@@ -1,6 +1,20 @@
 import tailwindcss from "bun-plugin-tailwind";
 import { mkdir } from "fs/promises";
 
+const supportedTargets = ["bun-linux-x64", "bun-linux-arm64"] as const;
+type BuildTarget = (typeof supportedTargets)[number];
+
+const buildTarget = process.env.BUILD_TARGET;
+
+if (buildTarget && !supportedTargets.includes(buildTarget as BuildTarget)) {
+  console.error(
+    `Unsupported BUILD_TARGET: ${buildTarget}. Expected one of: ${supportedTargets.join(", ")}`,
+  );
+  process.exit(1);
+}
+
+const target = buildTarget as BuildTarget | undefined;
+
 await mkdir("./dist", { recursive: true });
 
 const server = await Bun.build({
@@ -9,6 +23,7 @@ const server = await Bun.build({
   minify: true,
   plugins: [tailwindcss],
   compile: {
+    target,
     outfile: "./dist/ytdl",
   },
 });
@@ -26,6 +41,7 @@ const worker = await Bun.build({
   target: "bun",
   minify: true,
   compile: {
+    target,
     outfile: "./dist/ytdl-worker",
   },
 });

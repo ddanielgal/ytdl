@@ -1,6 +1,6 @@
 # Plan: move ytdl to a dedicated NetBird hostname
 
-This plan describes how to keep hosting this app on the Raspberry Pi, remove the `/ytdl` subpath requirement, and access it through your NetBird mesh using a dedicated private hostname distributed by a NetBird Custom Zone.
+This plan describes how to keep hosting this app on the Raspberry Pi, remove the `/ytdl` subpath requirement, and access it through your NetBird mesh using the private hostname `ytdl.mink.lan` distributed by a NetBird Custom Zone.
 
 It is based on:
 
@@ -12,20 +12,18 @@ It is based on:
 
 Use a dedicated hostname and serve the app at `/`, not under a subpath.
 
-Use a NetBird Custom Zone for private DNS, and use plain HTTP over the NetBird mesh unless you later decide to introduce explicit certificate management.
+Use a NetBird Custom Zone for private DNS, and terminate HTTPS at the Kubernetes ingress using a manually created self-signed certificate stored as a TLS secret.
 
-Recommended hostname shape:
+Chosen hostname:
 
-- `ytdl.mink.home.arpa`
+- `ytdl.mink.lan`
 
-//// i made up my mind about the hostname. i would like `ytdl.mink.lan` on the `mink.lan` custom zone.
-
-Why this is the safest default:
+Why this is the chosen shape:
 
 - it stays fully private and does not depend on public DNS,
 - it avoids conflicting with your existing peer naming under `mink.danielgal.eu`,
-- `home.arpa` is purpose-built for home-network naming,
-- and it keeps the setup simple: NetBird handles encrypted transport, Kubernetes serves plain HTTP.
+- it is easy to remember,
+- and it still keeps the cluster changes small because the only HTTPS addition is a TLS secret plus ingress TLS config.
 
 ## Executive summary
 
@@ -35,7 +33,7 @@ The cleanest setup is:
 2. Change the app so it is root-hosted at `/` instead of `/ytdl`.
 3. Change the Kubernetes Ingress to route a dedicated host instead of a path prefix.
 4. Publish a private hostname through a NetBird Custom Zone.
-5. Use plain HTTP inside the mesh and keep the service private to NetBird peers.
+5. Serve the app at `https://ytdl.mink.lan` using a self-signed ingress certificate that you manually trust on peer devices.
 
 ## What NetBird can do here
 
@@ -87,9 +85,7 @@ That means the app, ingress, and browser routing are all aligned around subpath 
 
 After the change, a NetBird-connected client should open:
 
-- `http://ytdl.mink.home.arpa/`
-
-You can swap that hostname later if you choose a different private zone, but the app should behave the same.
+- `https://ytdl.mink.lan/`
 
 And the app should work entirely at root:
 
@@ -101,10 +97,10 @@ And the app should work entirely at root:
 
 The desired request path becomes:
 
-1. NetBird peer resolves `ytdl.mink.home.arpa`.
+1. NetBird peer resolves `ytdl.mink.lan`.
 2. DNS returns the Raspberry Pi-reachable address for the ingress entry point.
 3. Request reaches the ingress controller on the Pi's cluster.
-4. Ingress matches by **host**, not by subpath.
+4. Ingress matches by **host**, terminates TLS with the self-signed certificate, and routes by `/`.
 5. Ingress forwards to service `ytdl`.
 6. Service forwards to the app pod on port `3000`.
 7. App serves frontend routes from `/` and API from `/api/trpc`.
@@ -218,7 +214,7 @@ spec:
 
 Use a dedicated host and route `/`.
 
-Example for `ytdl.mink.home.arpa`:
+Example for `ytdl.mink.lan`:
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -227,8 +223,12 @@ metadata:
   name: ytdl
 spec:
   ingressClassName: traefik
+  tls:
+    - hosts:
+        - ytdl.mink.lan
+      secretName: ytdl-tls
   rules:
-    - host: ytdl.mink.home.arpa
+    - host: ytdl.mink.lan
       http:
         paths:
           - path: /
@@ -244,9 +244,7 @@ If your cluster uses a different ingress controller, replace `ingressClassName` 
 
 ### TLS
 
-For your stated preference, the plan should use plain HTTP over NetBird.
-
-//// i changed my mind here. let's do self-signed certificate that I will add to my peer devices' browsers manually. implement this with the minimal disruption of the cluster. and so now i would be able to use https://ytdl.mink.lan to access this app.
+For your updated preference, the plan should use a self-signed certificate with minimal cluster disruption.
 
 Important distinction:
 
@@ -254,18 +252,54 @@ Important distinction:
 - NetBird does **not** terminate browser HTTPS for an ordinary private service.
 - So there is no "NetBird-only TLS termination" mode where Kubernetes can stay simple and the browser still sees normal HTTPS without any certificate work.
 
-That means the practical choices are:
+The smallest-change HTTPS design is:
 
-- `http://ytdl.mink.home.arpa` over the encrypted NetBird mesh, or
-- introduce separate certificate management at the app/ingress layer.
+- keep the app container exactly as it is,
+- terminate TLS at the ingress controller,
+- create one self-signed cert for `ytdl.mink.lan`,
+- store it in a Kubernetes TLS secret,
+- and manually trust that certificate on your NetBird peer devices.
 
-Because you explicitly do not want extra cluster resources such as `cert-manager`, the recommended plan is:
+This avoids adding cluster-wide components such as `cert-manager`.
 
-- keep Kubernetes ingress on plain HTTP,
-- keep the app private to NetBird peers,
-- rely on NetBird/WireGuard for transport encryption.
+### Recommended TLS implementation
 
-In other words: the browser URL will be `http://...`, but the traffic still travels inside the encrypted mesh.
+Use ingress TLS termination with a manually managed secret.
+
+Why this is the least disruptive:
+
+- no app code changes for TLS,
+- no sidecar or extra proxy per app,
+- no new controller installation,
+- just one secret plus ingress `tls:` configuration.
+
+### Concrete certificate approach
+
+Generate a certificate for `ytdl.mink.lan` and create a secret such as `ytdl-tls` in the app namespace.
+
+Example secret shape:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ytdl-tls
+  namespace: ytdl
+type: kubernetes.io/tls
+data:
+  tls.crt: <base64-cert>
+  tls.key: <base64-key>
+```
+
+### Operational note
+
+The simplest version is a self-signed leaf certificate for `ytdl.mink.lan` that you install into the trust store of each peer device/browser.
+
+That works for a single service. If you later add more private HTTPS services, a small private CA would become cleaner, but it is not necessary for this migration.
+
+After this change, the browser URL becomes:
+
+- `https://ytdl.mink.lan`
 
 ## 3. Clean up the Kubernetes app structure
 
@@ -438,53 +472,19 @@ So the real constraint is not the TLD itself. The real constraints are:
 
 ### Practical hostname guidance
 
-NetBird Custom Zones work best when you think in terms of:
+For this plan, the hostname is fixed:
 
-- a **zone**, such as `mink.home.arpa`,
-- plus a **record hostname**, such as `ytdl`.
-
-That produces the final app hostname:
-
-- `ytdl.mink.home.arpa`
-
-This is better than trying to think only in terms of a one-off hostname like `ytdl.internal`.
-
-### Brainstorm: candidate private domains
-
-Best candidates:
-
-- `mink.home.arpa` -> app becomes `ytdl.mink.home.arpa`
-- `mesh.home.arpa` -> app becomes `ytdl.mesh.home.arpa`
-- `services.home.arpa` -> app becomes `ytdl.services.home.arpa`
-- `danielgal.home.arpa` -> app becomes `ytdl.danielgal.home.arpa`
-
-Acceptable if NetBird accepts them and you prefer the style:
-
-- `mink.internal` -> `ytdl.mink.internal`
-- `danielgal.internal` -> `ytdl.danielgal.internal`
-- `mink.private` -> `ytdl.mink.private`
-- `mink.test` -> `ytdl.mink.test`
-
-Candidates to avoid or treat cautiously:
-
-- `*.local` because `.local` commonly conflicts with mDNS / Bonjour on many systems
-- your existing peer DNS domain, if that is `mink.danielgal.eu`
-- made-up TLDs like `.lan`, `.home`, or `.corp`, which are common in homelabs but historically more collision-prone
-
-### Recommended domain choice
-
-The best fit for this plan is:
-
-- zone: `mink.home.arpa`
+- zone: `mink.lan`
 - record: `ytdl`
-- final hostname: `ytdl.mink.home.arpa`
+- final hostname: `ytdl.mink.lan`
 
-Why:
+This is acceptable for NetBird Custom Zones as long as:
 
-- `home.arpa` is specifically intended for home-network naming,
-- it avoids `.local` mDNS weirdness,
-- it does not depend on your public domain,
-- and it keeps the NetBird-only/private intent obvious.
+- NetBird accepts the zone as a valid FQDN,
+- it does not conflict with the NetBird peer DNS domain,
+- and your peer devices rely on NetBird DNS for resolution.
+
+`mink.lan` is not as standards-oriented as `home.arpa`, but since this is a private NetBird-only namespace and you explicitly chose it, the plan should align to that choice.
 
 ### How it works
 
@@ -525,7 +525,7 @@ This matters because your peer is already named `pi.mink.danielgal.eu`.
 
 If your NetBird peer DNS domain is `mink.danielgal.eu`, then creating a Custom Zone on that same domain may not be allowed.
 
-That is another reason the `mink.home.arpa` direction is attractive.
+That is why using `mink.lan` as a separate private zone can work well here, provided it does not conflict with the peer DNS domain configured in NetBird.
 
 ### Good fit when
 
@@ -577,19 +577,13 @@ This is useful, but separate from your main private-mesh goal.
 
 ### Preferred
 
-- `ytdl.mink.home.arpa`
+- `ytdl.mink.lan`
 
-### Good alternatives
+### Why this works
 
-- `ytdl.mesh.home.arpa`
-- `ytdl.danielgal.home.arpa`
-- `ytdl.mink.internal`
-
-### Why prefer the `home.arpa` form first
-
-- it fits a private homelab/mesh service well,
-- it avoids `.local` resolver conflicts,
-- and it avoids entangling this private service with your public domain naming.
+- it is short and memorable,
+- it is private to your NetBird environment,
+- and it is independent from your public DNS domain.
 
 ## Detailed rollout plan
 
@@ -628,7 +622,7 @@ Use a NetBird Custom Zone.
 ### Recommended order
 
 1. In NetBird, verify the current peer DNS domain so you avoid conflicts.
-2. Create zone `mink.home.arpa`.
+2. Create zone `mink.lan`.
 3. Add record `ytdl` -> `<pi-netbird-ip>`.
 4. Distribute the zone to the peer groups that should access the app.
 5. Test resolution from one Linux client and one non-Linux client if you use both.
@@ -706,8 +700,12 @@ metadata:
   namespace: ytdl
 spec:
   ingressClassName: traefik
+  tls:
+    - hosts:
+        - ytdl.mink.lan
+      secretName: ytdl-tls
   rules:
-    - host: ytdl.mink.home.arpa
+    - host: ytdl.mink.lan
       http:
         paths:
           - path: /
@@ -742,15 +740,44 @@ spec:
 ### Concrete setup
 
 1. Open NetBird Dashboard -> `DNS` -> `Zones`.
-2. Create zone `mink.home.arpa`.
+2. Create zone `mink.lan`.
 3. Select the peer groups that should resolve this service.
 4. Optionally enable search domain only if you actually want short-name lookups like `ytdl`.
 5. Add record:
-   - hostname: `ytdl`
-   - type: `A`
-   - value: `<pi-netbird-ip>`
-   - ttl: `300`
-6. Save and test `ytdl.mink.home.arpa` from a NetBird-connected client.
+    - hostname: `ytdl`
+    - type: `A`
+    - value: `<pi-netbird-ip>`
+    - ttl: `300`
+6. Save and test `ytdl.mink.lan` from a NetBird-connected client.
+
+## HTTPS setup with self-signed certificate
+
+### Concrete setup
+
+1. Generate a private key and self-signed certificate for `ytdl.mink.lan`.
+2. Make sure the certificate includes `subjectAltName=DNS:ytdl.mink.lan`.
+3. Create Kubernetes TLS secret `ytdl-tls` in namespace `ytdl`.
+4. Reference `ytdl-tls` from the ingress `tls:` section.
+5. Export the certificate and install it into the trust store of each peer device/browser that should access the app.
+6. Test `https://ytdl.mink.lan` from at least one desktop and one mobile device if you use both.
+
+### Minimal-disruption example commands
+
+```bash
+openssl req -x509 -nodes -newkey rsa:4096 -days 825 \
+  -keyout ytdl.mink.lan.key \
+  -out ytdl.mink.lan.crt \
+  -subj "/CN=ytdl.mink.lan" \
+  -addext "subjectAltName=DNS:ytdl.mink.lan"
+```
+
+```bash
+kubectl -n ytdl create secret tls ytdl-tls \
+  --cert="ytdl.mink.lan.crt" \
+  --key="ytdl.mink.lan.key"
+```
+
+If the secret already exists, recreate or update it as part of your deployment workflow.
 
 ### Pros
 
@@ -758,11 +785,13 @@ spec:
 - private visibility controlled by NetBird groups
 - no public DNS or internet exposure required
 - clean fit for a private Pi-hosted app
+- HTTPS works in the browser once the cert is trusted locally
 
 ### Cons
 
 - hostname will be private-only, not a public DNS name
 - you must avoid any zone that conflicts with the NetBird peer DNS domain
+- certificate trust must be installed manually on each peer device
 
 ### Search-domain note
 
@@ -803,7 +832,7 @@ That way, if DNS is messy, you still have a clean app deployment.
 For a short transition period, it is reasonable to support both:
 
 - old: `http://pi.home/ytdl`
-- new: `http://ytdl.mink.home.arpa/`
+- new: `https://ytdl.mink.lan/`
 
 Once the new path is stable, remove the old one.
 
@@ -823,7 +852,7 @@ The repo does not define the ingress controller, so you will need to align the i
 
 ### TLS may require separate work
 
-If you later decide you want real HTTPS for `ytdl.mink.home.arpa`, you will need certificate management outside of NetBird transport encryption. That is intentionally out of scope for this plan.
+You chose to do HTTPS now using a manually trusted self-signed cert. The main operational cost is cert distribution and future renewal on every peer device.
 
 ### Registry hostname is a separate concern
 
@@ -835,15 +864,15 @@ Implement this in the following order:
 
 1. Remove `/ytdl` assumptions from the app.
 2. Update Kubernetes ingress to a dedicated hostname at `/`.
-3. Publish `ytdl.mink.home.arpa` through a NetBird Custom Zone.
-4. Keep the service on plain HTTP over NetBird.
-5. Add certificate management later only if you decide browser HTTPS is worth the extra complexity.
+3. Publish `ytdl.mink.lan` through a NetBird Custom Zone.
+4. Create self-signed cert + Kubernetes TLS secret `ytdl-tls`.
+5. Trust the cert on peer devices and use `https://ytdl.mink.lan`.
 
 If you want the exact shortest path with the fewest NetBird surprises, the best practical target is:
 
-- app URL: `http://ytdl.mink.home.arpa/`
+- app URL: `https://ytdl.mink.lan/`
 
 And the best NetBird integration path is:
 
-- use a NetBird Custom Zone such as `mink.home.arpa`,
+- use the NetBird Custom Zone `mink.lan`,
 - avoid NetBird Reverse Proxy unless you decide the app should be exposed beyond the private mesh.

@@ -245,6 +245,8 @@ If your cluster uses a different ingress controller, replace `ingressClassName` 
 
 If you want HTTPS on the private hostname, add TLS at the ingress layer.
 
+//// if i can do https with netbird only (the network layer tls-terminates and the kubernetes cluster only serves https) then do https. if any other cluster resources are needed like cert-manager etc., then i prefer plain http. pi is on a secure home network, i don't want to expose it to the internet in any way, and i am using netbird to access services on the pi, through the netbird mesh network.
+
 Example:
 
 ```yaml
@@ -291,7 +293,10 @@ The current structure is close, but I would change it slightly while doing the h
 - `PersistentVolumeClaim`: Redis data
 - `Ingress`: dedicated hostname
 
+
 ### Important manifest fix
+
+//// do not do this, data is fine as it is
 
 The app code reads from `data`, but the current app deployment does not mount `/app/data`.
 
@@ -487,6 +492,8 @@ If you already have a DNS server for `mink.danielgal.eu`, this is the most direc
 ## Option B: NetBird Custom Zone
 
 This is the best option if you want a fully private service name without running your own DNS server.
+
+//// i choose this option. let's set up a netbird custom zone. explore options for a domain. it can be anything, list possibilities. like ytdl.internal, ytdl.local, ytdl.danielgal.internal, ytdl.mink.internal, is any other tld possible other than `internal` and `local`? brainstorm here.
 
 ### How it works
 

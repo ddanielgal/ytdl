@@ -18,6 +18,8 @@ Recommended hostname shape:
 
 - `ytdl.mink.home.arpa`
 
+//// i made up my mind about the hostname. i would like `ytdl.mink.lan` on the `mink.lan` custom zone.
+
 Why this is the safest default:
 
 - it stays fully private and does not depend on public DNS,
@@ -243,6 +245,8 @@ If your cluster uses a different ingress controller, replace `ingressClassName` 
 ### TLS
 
 For your stated preference, the plan should use plain HTTP over NetBird.
+
+//// i changed my mind here. let's do self-signed certificate that I will add to my peer devices' browsers manually. implement this with the minimal disruption of the cluster. and so now i would be able to use https://ytdl.mink.lan to access this app.
 
 Important distinction:
 

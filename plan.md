@@ -1,6 +1,6 @@
 # Plan: move ytdl to a dedicated NetBird hostname
 
-This plan describes how to keep hosting this app on the Raspberry Pi, remove the `/ytdl` subpath requirement, and access it through your NetBird mesh using a dedicated hostname such as `ytdl.mink.danielgal.eu` or `ytdl.pi.mink.danielgal.eu`.
+This plan describes how to keep hosting this app on the Raspberry Pi, remove the `/ytdl` subpath requirement, and access it through your NetBird mesh using a dedicated private hostname distributed by a NetBird Custom Zone.
 
 It is based on:
 
@@ -12,17 +12,18 @@ It is based on:
 
 Use a dedicated hostname and serve the app at `/`, not under a subpath.
 
-Recommended target hostname:
+Use a NetBird Custom Zone for private DNS, and use plain HTTP over the NetBird mesh unless you later decide to introduce explicit certificate management.
 
-- `ytdl.pi.mink.danielgal.eu`
+Recommended hostname shape:
+
+- `ytdl.mink.home.arpa`
 
 Why this is the safest default:
 
-- it keeps the service clearly attached to the Pi peer,
-- it avoids reusing the bare `mink.danielgal.eu` namespace too aggressively,
-- and it is easier to reason about if you later expose more services from the same Pi.
-
-`ytdl.mink.danielgal.eu` is also fine if you want a cleaner service-first name. The rest of the plan works for either hostname.
+- it stays fully private and does not depend on public DNS,
+- it avoids conflicting with your existing peer naming under `mink.danielgal.eu`,
+- `home.arpa` is purpose-built for home-network naming,
+- and it keeps the setup simple: NetBird handles encrypted transport, Kubernetes serves plain HTTP.
 
 ## Executive summary
 
@@ -31,8 +32,8 @@ The cleanest setup is:
 1. Keep the app on the Raspberry Pi and in Kubernetes.
 2. Change the app so it is root-hosted at `/` instead of `/ytdl`.
 3. Change the Kubernetes Ingress to route a dedicated host instead of a path prefix.
-4. Publish that hostname into your NetBird-accessible DNS path.
-5. Keep access private to NetBird peers unless you explicitly decide to use NetBird Reverse Proxy later.
+4. Publish a private hostname through a NetBird Custom Zone.
+5. Use plain HTTP inside the mesh and keep the service private to NetBird peers.
 
 ## What NetBird can do here
 
@@ -84,11 +85,9 @@ That means the app, ingress, and browser routing are all aligned around subpath 
 
 After the change, a NetBird-connected client should open:
 
-- `https://ytdl.pi.mink.danielgal.eu/`
+- `http://ytdl.mink.home.arpa/`
 
-or:
-
-- `https://ytdl.mink.danielgal.eu/`
+You can swap that hostname later if you choose a different private zone, but the app should behave the same.
 
 And the app should work entirely at root:
 
@@ -100,7 +99,7 @@ And the app should work entirely at root:
 
 The desired request path becomes:
 
-1. NetBird peer resolves `ytdl.pi.mink.danielgal.eu`.
+1. NetBird peer resolves `ytdl.mink.home.arpa`.
 2. DNS returns the Raspberry Pi-reachable address for the ingress entry point.
 3. Request reaches the ingress controller on the Pi's cluster.
 4. Ingress matches by **host**, not by subpath.
@@ -217,7 +216,7 @@ spec:
 
 Use a dedicated host and route `/`.
 
-Example for `ytdl.pi.mink.danielgal.eu`:
+Example for `ytdl.mink.home.arpa`:
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -227,7 +226,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: ytdl.pi.mink.danielgal.eu
+    - host: ytdl.mink.home.arpa
       http:
         paths:
           - path: /
@@ -243,37 +242,26 @@ If your cluster uses a different ingress controller, replace `ingressClassName` 
 
 ### TLS
 
-If you want HTTPS on the private hostname, add TLS at the ingress layer.
+For your stated preference, the plan should use plain HTTP over NetBird.
 
-//// if i can do https with netbird only (the network layer tls-terminates and the kubernetes cluster only serves https) then do https. if any other cluster resources are needed like cert-manager etc., then i prefer plain http. pi is on a secure home network, i don't want to expose it to the internet in any way, and i am using netbird to access services on the pi, through the netbird mesh network.
+Important distinction:
 
-Example:
+- NetBird encrypts transport between peers using WireGuard.
+- NetBird does **not** terminate browser HTTPS for an ordinary private service.
+- So there is no "NetBird-only TLS termination" mode where Kubernetes can stay simple and the browser still sees normal HTTPS without any certificate work.
 
-```yaml
-spec:
-  ingressClassName: traefik
-  tls:
-    - hosts:
-        - ytdl.pi.mink.danielgal.eu
-      secretName: ytdl-tls
-  rules:
-    - host: ytdl.pi.mink.danielgal.eu
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: ytdl
-                port:
-                  number: 80
-```
+That means the practical choices are:
 
-For a private-only service, you have three practical TLS options:
+- `http://ytdl.mink.home.arpa` over the encrypted NetBird mesh, or
+- introduce separate certificate management at the app/ingress layer.
 
-- start with plain HTTP over NetBird,
-- use cert-manager with DNS-01 if your public DNS provider supports it,
-- or use an internal/private certificate trusted by your own devices.
+Because you explicitly do not want extra cluster resources such as `cert-manager`, the recommended plan is:
+
+- keep Kubernetes ingress on plain HTTP,
+- keep the app private to NetBird peers,
+- rely on NetBird/WireGuard for transport encryption.
+
+In other words: the browser URL will be `http://...`, but the traffic still travels inside the encrypted mesh.
 
 ## 3. Clean up the Kubernetes app structure
 
@@ -294,13 +282,9 @@ The current structure is close, but I would change it slightly while doing the h
 - `Ingress`: dedicated hostname
 
 
-### Important manifest fix
+### App deployment
 
-//// do not do this, data is fine as it is
-
-The app code reads from `data`, but the current app deployment does not mount `/app/data`.
-
-If you want the app pod to see downloaded files, mount the same shared PVC into the app container too.
+Per your note, do not change the current data arrangement as part of this migration. Treat the data layout as out of scope for this plan.
 
 Recommended app deployment shape:
 
@@ -330,13 +314,6 @@ spec:
           envFrom:
             - configMapRef:
                 name: ytdl
-          volumeMounts:
-            - name: ytdl-data
-              mountPath: /app/data
-      volumes:
-        - name: ytdl-data
-          persistentVolumeClaim:
-            claimName: ytdl-data
 ```
 
 ### Worker deployment
@@ -365,7 +342,7 @@ spec:
     spec:
       containers:
         - name: ytdl-worker
-          image: pi.mink.danielgal.eu:30500/ddanielgal/ytdl:latest
+          image: pi.home:30500/ddanielgal/ytdl:latest
           command: ["bun", "run", "src/worker/worker.ts"]
           envFrom:
             - configMapRef:
@@ -432,68 +409,78 @@ For a small Pi-hosted setup, keeping Redis as a deployment is acceptable if you 
 
 ## 4. Choose how the hostname resolves inside NetBird
 
-This is the main NetBird design decision.
+You chose NetBird Custom Zones, so this is now the primary path.
 
-There are three realistic options.
-
-## Option A: existing DNS for `mink.danielgal.eu` + NetBird nameserver distribution
-
-This is the best option if you want to use **exactly** `ytdl.mink.danielgal.eu` or `ytdl.pi.mink.danielgal.eu`.
-
-### How it works
-
-1. You host or control DNS for `mink.danielgal.eu`.
-2. You add an `A` record for the ytdl hostname.
-3. That record points to the Raspberry Pi's **NetBird IP** or another address reachable only to NetBird peers.
-4. In NetBird, you distribute the relevant nameserver to your peers.
-
-### Why this fits the docs well
-
-NetBird docs support:
-
-- custom nameservers,
-- match domains,
-- search domains,
-- and using internal DNS servers behind routing peers if needed.
-
-### Good fit when
-
-- you already control DNS for `mink.danielgal.eu`,
-- you want the service name to live in your real domain,
-- and you want the same hostname across devices.
-
-### Example
-
-If the Pi's NetBird IP is `100.x.y.z`, create:
-
-- `ytdl.pi.mink.danielgal.eu -> 100.x.y.z`
-
-or:
-
-- `ytdl.mink.danielgal.eu -> 100.x.y.z`
-
-Then configure NetBird DNS:
-
-- Nameserver distributed to the peer groups that should resolve `mink.danielgal.eu`
-- Match domain: `mink.danielgal.eu`
-
-### NetBird notes
-
-Per current docs:
-
-- Linux peers always get NetBird DNS behavior for peer domains.
-- Match-domain nameservers work best on macOS, Windows 10+, and Linux with `systemd-resolved`.
-- If the DNS server is behind a routed private network, NetBird recommends using Networks plus an access policy for UDP 53.
-
-### Recommendation
-
-If you already have a DNS server for `mink.danielgal.eu`, this is the most direct way to get the exact hostname you want.
-
-## Option B: NetBird Custom Zone
+## Chosen option: NetBird Custom Zone
 
 This is the best option if you want a fully private service name without running your own DNS server.
 
-//// i choose this option. let's set up a netbird custom zone. explore options for a domain. it can be anything, list possibilities. like ytdl.internal, ytdl.local, ytdl.danielgal.internal, ytdl.mink.internal, is any other tld possible other than `internal` and `local`? brainstorm here.
+### What NetBird docs allow
+
+Per the current docs, a Custom Zone domain:
+
+- must be a valid FQDN,
+- must not conflict with the NetBird peer DNS domain,
+- is distributed only to the selected peer groups,
+- and can contain `A`, `AAAA`, and `CNAME` records.
+
+The docs do **not** say you are limited to `.internal` or `.local`.
+
+So the real constraint is not the TLD itself. The real constraints are:
+
+- valid FQDN syntax,
+- no conflict with your NetBird peer DNS domain,
+- and picking a name that behaves well on client devices.
+
+### Practical hostname guidance
+
+NetBird Custom Zones work best when you think in terms of:
+
+- a **zone**, such as `mink.home.arpa`,
+- plus a **record hostname**, such as `ytdl`.
+
+That produces the final app hostname:
+
+- `ytdl.mink.home.arpa`
+
+This is better than trying to think only in terms of a one-off hostname like `ytdl.internal`.
+
+### Brainstorm: candidate private domains
+
+Best candidates:
+
+- `mink.home.arpa` -> app becomes `ytdl.mink.home.arpa`
+- `mesh.home.arpa` -> app becomes `ytdl.mesh.home.arpa`
+- `services.home.arpa` -> app becomes `ytdl.services.home.arpa`
+- `danielgal.home.arpa` -> app becomes `ytdl.danielgal.home.arpa`
+
+Acceptable if NetBird accepts them and you prefer the style:
+
+- `mink.internal` -> `ytdl.mink.internal`
+- `danielgal.internal` -> `ytdl.danielgal.internal`
+- `mink.private` -> `ytdl.mink.private`
+- `mink.test` -> `ytdl.mink.test`
+
+Candidates to avoid or treat cautiously:
+
+- `*.local` because `.local` commonly conflicts with mDNS / Bonjour on many systems
+- your existing peer DNS domain, if that is `mink.danielgal.eu`
+- made-up TLDs like `.lan`, `.home`, or `.corp`, which are common in homelabs but historically more collision-prone
+
+### Recommended domain choice
+
+The best fit for this plan is:
+
+- zone: `mink.home.arpa`
+- record: `ytdl`
+- final hostname: `ytdl.mink.home.arpa`
+
+Why:
+
+- `home.arpa` is specifically intended for home-network naming,
+- it avoids `.local` mDNS weirdness,
+- it does not depend on your public domain,
+- and it keeps the NetBird-only/private intent obvious.
 
 ### How it works
 
@@ -519,19 +506,28 @@ If your NetBird peer DNS domain is actually `mink.danielgal.eu`, then creating a
 - you do not want to run an internal DNS server,
 - and your chosen zone does not conflict with the peer DNS domain.
 
-### Possible variant
+### How it works
 
-If the conflict exists, use a dedicated internal service zone such as:
+1. Create a NetBird Custom Zone.
+2. Add an `A` record for `ytdl`.
+3. Point that record to the Raspberry Pi's NetBird IP.
+4. Distribute that zone to the peer groups that should access the app.
 
-- `home.mink.danielgal.eu`
-- `mesh.mink.danielgal.eu`
-- `internal.mink.danielgal.eu`
+### Important limitation
 
-Then create:
+Per the current docs, a Custom Zone **must not conflict with the NetBird peer DNS domain**.
 
-- `ytdl.home.mink.danielgal.eu`
+This matters because your peer is already named `pi.mink.danielgal.eu`.
 
-This is not your first-choice hostname, but it is operationally clean.
+If your NetBird peer DNS domain is `mink.danielgal.eu`, then creating a Custom Zone on that same domain may not be allowed.
+
+That is another reason the `mink.home.arpa` direction is attractive.
+
+### Good fit when
+
+- you do not want to run an internal DNS server,
+- you want the service visible only to selected NetBird peers,
+- and you are fine using a private service domain rather than your public domain.
 
 ## Option C: NetBird Reverse Proxy
 
@@ -577,17 +573,19 @@ This is useful, but separate from your main private-mesh goal.
 
 ### Preferred
 
-- `ytdl.pi.mink.danielgal.eu`
+- `ytdl.mink.home.arpa`
 
-### Alternative
+### Good alternatives
 
-- `ytdl.mink.danielgal.eu`
+- `ytdl.mesh.home.arpa`
+- `ytdl.danielgal.home.arpa`
+- `ytdl.mink.internal`
 
-### Why prefer the `pi` form first
+### Why prefer the `home.arpa` form first
 
-- it keeps the service explicitly attached to the Pi peer,
-- it avoids future confusion if you later move some services off the Pi,
-- and it is easier to alias later if you want `ytdl.mink.danielgal.eu` as the stable public-facing name.
+- it fits a private homelab/mesh service well,
+- it avoids `.local` resolver conflicts,
+- and it avoids entangling this private service with your public domain naming.
 
 ## Detailed rollout plan
 
@@ -609,30 +607,27 @@ This is useful, but separate from your main private-mesh goal.
 
 1. Introduce a namespace, e.g. `ytdl`.
 2. Update manifests to include that namespace consistently.
-3. Mount the shared media PVC into the app pod as well as the worker pod.
-4. Keep the worker and Redis split as separate workloads.
-5. Update ingress to host-based routing.
-6. Update image host if you want to stop using `pi.home:30500`.
+3. Keep the worker and Redis split as separate workloads.
+4. Update ingress to host-based routing.
+5. Keep the current image host unless you separately decide to rename the registry endpoint.
 
 ### Registry note
 
 The repo currently uses `pi.home:30500/ddanielgal/ytdl:latest`.
 
-If you want naming consistency with the new access model, consider moving to:
-
-- `pi.mink.danielgal.eu:30500/ddanielgal/ytdl:latest`
-
-Only do this if your Kubernetes node or nodes can resolve and reach that hostname. If not, leave the registry hostname alone for now and decouple the app URL migration from the image registry migration.
+Leave the registry hostname alone for this migration unless you have a separate reason to rename it. The application URL and the container registry endpoint do not need to match.
 
 ## Phase 3: DNS inside NetBird
 
-Choose one of the DNS strategies above.
+Use a NetBird Custom Zone.
 
 ### Recommended order
 
-1. First try **Option A** if you already operate DNS for `mink.danielgal.eu`.
-2. Use **Option B** only if Custom Zone compatibility with your peer DNS domain is confirmed.
-3. Leave **Option C** for later unless you explicitly want public exposure.
+1. In NetBird, verify the current peer DNS domain so you avoid conflicts.
+2. Create zone `mink.home.arpa`.
+3. Add record `ytdl` -> `<pi-netbird-ip>`.
+4. Distribute the zone to the peer groups that should access the app.
+5. Test resolution from one Linux client and one non-Linux client if you use both.
 
 ## Phase 4: switch clients over
 
@@ -708,7 +703,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: ytdl.pi.mink.danielgal.eu
+    - host: ytdl.mink.home.arpa
       http:
         paths:
           - path: /
@@ -738,48 +733,36 @@ spec:
 
 ## NetBird-specific plan details
 
-## If using NetBird nameservers
+## NetBird Custom Zone setup
 
-Use this when `mink.danielgal.eu` is resolved by a DNS server you control.
+### Concrete setup
 
-### Steps
-
-1. Add or confirm an `A` record for the new ytdl hostname.
-2. In NetBird, go to `DNS -> Nameservers`.
-3. Add a custom nameserver that can answer for `mink.danielgal.eu`.
-4. Add `mink.danielgal.eu` as a match domain.
-5. Distribute it to the groups that should access ytdl.
-6. If that DNS server is on a private subnet behind a routing peer, add it as a NetBird Network resource and allow UDP 53.
-
-### Pros
-
-- exact hostname control
-- works well with your real domain
-- easy to add more services later
-
-### Cons
-
-- requires a DNS server authoritative for the zone or subzone
-
-## If using NetBird Custom Zones
-
-Use this only if the zone does not conflict with the peer DNS domain.
-
-### Steps
-
-1. In NetBird, go to `DNS -> Zones`.
-2. Create a zone for a non-conflicting internal service domain.
-3. Add an `A` record pointing to the Pi's NetBird IP.
-4. Distribute it to the right peer groups.
+1. Open NetBird Dashboard -> `DNS` -> `Zones`.
+2. Create zone `mink.home.arpa`.
+3. Select the peer groups that should resolve this service.
+4. Optionally enable search domain only if you actually want short-name lookups like `ytdl`.
+5. Add record:
+   - hostname: `ytdl`
+   - type: `A`
+   - value: `<pi-netbird-ip>`
+   - ttl: `300`
+6. Save and test `ytdl.mink.home.arpa` from a NetBird-connected client.
 
 ### Pros
 
 - no separate DNS server required
-- peer-scoped visibility is very clean
+- private visibility controlled by NetBird groups
+- no public DNS or internet exposure required
+- clean fit for a private Pi-hosted app
 
 ### Cons
 
-- may not support `mink.danielgal.eu` directly if that is the existing peer DNS domain
+- hostname will be private-only, not a public DNS name
+- you must avoid any zone that conflicts with the NetBird peer DNS domain
+
+### Search-domain note
+
+Only enable the zone as a search domain if you truly want users to type just `ytdl`. If you prefer explicitness and fewer resolver surprises, keep search domains disabled and use the full hostname.
 
 ## If using NetBird Reverse Proxy later
 
@@ -816,7 +799,7 @@ That way, if DNS is messy, you still have a clean app deployment.
 For a short transition period, it is reasonable to support both:
 
 - old: `http://pi.home/ytdl`
-- new: `https://ytdl.pi.mink.danielgal.eu/`
+- new: `http://ytdl.mink.home.arpa/`
 
 Once the new path is stable, remove the old one.
 
@@ -836,7 +819,7 @@ The repo does not define the ingress controller, so you will need to align the i
 
 ### TLS may require separate work
 
-If you want real HTTPS for `ytdl.mink.danielgal.eu` without public exposure, DNS-01 certificate issuance is the cleanest route, but it is extra setup.
+If you later decide you want real HTTPS for `ytdl.mink.home.arpa`, you will need certificate management outside of NetBird transport encryption. That is intentionally out of scope for this plan.
 
 ### Registry hostname is a separate concern
 
@@ -848,16 +831,15 @@ Implement this in the following order:
 
 1. Remove `/ytdl` assumptions from the app.
 2. Update Kubernetes ingress to a dedicated hostname at `/`.
-3. Mount the shared data PVC into the app deployment as well.
-4. Publish `ytdl.pi.mink.danielgal.eu` through NetBird-friendly DNS.
-5. Add TLS only after the hostname and routing are stable.
+3. Publish `ytdl.mink.home.arpa` through a NetBird Custom Zone.
+4. Keep the service on plain HTTP over NetBird.
+5. Add certificate management later only if you decide browser HTTPS is worth the extra complexity.
 
 If you want the exact shortest path with the fewest NetBird surprises, the best practical target is:
 
-- app URL: `http://ytdl.pi.mink.danielgal.eu/` first
-- then later: `https://ytdl.pi.mink.danielgal.eu/`
+- app URL: `http://ytdl.mink.home.arpa/`
 
 And the best NetBird integration path is:
 
-- use NetBird-distributed nameserver resolution for `mink.danielgal.eu` if you already control that DNS,
+- use a NetBird Custom Zone such as `mink.home.arpa`,
 - avoid NetBird Reverse Proxy unless you decide the app should be exposed beyond the private mesh.

@@ -33,7 +33,7 @@ build-local:
 
 # Start the full stack via podman kube play (app + worker + redis)
 pod-up:
-    podman kube play podman-kube.yml
+    podman kube play --replace --network bridge podman-kube.yml
 
 # Tear down the pod
 pod-down:

@@ -9,7 +9,7 @@ FROM --platform=$TARGETPLATFORM docker.io/denoland/deno:bin-2.7.3 AS denobin
 FROM --platform=$TARGETPLATFORM docker.io/oven/bun:1-slim AS runner
 WORKDIR /app
 
-COPY package.json bun.lock* ./
+COPY package.json bun.lock* bunfig.toml ./
 RUN bun install --frozen-lockfile --production
 
 COPY tsconfig.json server.ts ./

@@ -4,7 +4,6 @@
   "private": true,
   "scripts": {
     "dev": "bun --hot server.ts",
-    "build": "bun build.ts",
     "start": "bun run server.ts",
     "lint": "eslint .",
     "worker": "bun run src/worker/worker.ts",
@@ -32,6 +31,7 @@
     "remeda": "^2.16.0",
     "rss-parser": "^3.13.0",
     "superjson": "^2.2.1",
+    "bun-plugin-tailwind": "^0.1.0",
     "tailwind-merge": "^2.5.4",
     "tailwindcss": "^4",
     "tailwindcss-animate": "^1.0.7",
@@ -41,7 +41,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^9",
-    "bun-plugin-tailwind": "^0.1.0",
     "bun-types": "latest",
     "@types/node": "^22",
     "@types/react": "^19",

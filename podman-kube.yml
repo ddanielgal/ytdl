@@ -33,7 +33,7 @@ spec:
 
     - name: worker
       image: localhost/ytdl:latest
-      command: ["./ytdl-worker"]
+      command: ["bun", "run", "src/worker/worker.ts"]
       envFrom:
         - configMapRef:
             name: ytdl

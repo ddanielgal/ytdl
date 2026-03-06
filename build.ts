@@ -23,8 +23,8 @@ const server = await Bun.build({
   minify: true,
   plugins: [tailwindcss],
   compile: {
-    target,
     outfile: "./dist/ytdl",
+    ...(target ? { target } : {}),
   },
 });
 
@@ -41,8 +41,8 @@ const worker = await Bun.build({
   target: "bun",
   minify: true,
   compile: {
-    target,
     outfile: "./dist/ytdl-worker",
+    ...(target ? { target } : {}),
   },
 });
 

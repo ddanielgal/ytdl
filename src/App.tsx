@@ -9,7 +9,7 @@ import { FeedsPage } from "~/pages/Feeds";
 export function App() {
   return (
     <TRPCProvider>
-      <BrowserRouter basename="/ytdl">
+      <BrowserRouter>
         <SidebarProvider defaultOpen={true}>
           <AppSidebar />
           <SidebarInset>

@@ -18,7 +18,7 @@ function getQueryClient() {
 }
 
 function getUrl() {
-  return "/ytdl/api/trpc";
+  return "/api/trpc";
 }
 
 export function TRPCProvider(

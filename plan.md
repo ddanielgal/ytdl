@@ -171,6 +171,9 @@ if [ -z "$TRAEFIK_POD_IP" ]; then
   exit 1
 fi
 
+echo "Using wt0 IP: $WT0_IP"
+echo "Detected Traefik pod IP: $TRAEFIK_POD_IP"
+
 # Recreate our dedicated DNAT table from scratch.
 nft delete table inet traefik_wt0_dnat 2>/dev/null || true
 nft add table inet traefik_wt0_dnat
@@ -183,8 +186,11 @@ nft add rule inet traefik_wt0_dnat prerouting iifname "wt0" ip daddr "$WT0_IP" t
 nft add rule inet traefik_wt0_dnat postrouting oifname "cni0" ip daddr "$TRAEFIK_POD_IP" tcp dport 8000 counter masquerade
 nft add rule inet traefik_wt0_dnat postrouting oifname "cni0" ip daddr "$TRAEFIK_POD_IP" tcp dport 8443 counter masquerade
 
+echo "Rebuilt inet traefik_wt0_dnat for pod IP $TRAEFIK_POD_IP"
+
 # Remove stale old Traefik pod accepts from the NetBird-managed forward chain.
 for handle in $(nft -a list chain ip netbird netbird-rt-fwd | awk '/ip daddr 10\.42\..* tcp dport (8000|8443)/ {print $NF}'); do
+  echo "Removing stale netbird-rt-fwd rule handle: $handle"
   nft delete rule ip netbird netbird-rt-fwd handle "$handle"
 done
 
@@ -192,6 +198,11 @@ done
 nft add rule ip netbird netbird-rt-fwd ip daddr "$TRAEFIK_POD_IP" tcp dport 8000 counter accept
 nft add rule ip netbird netbird-rt-fwd ip daddr "$TRAEFIK_POD_IP" tcp dport 8443 counter accept
 
+echo "Added netbird-rt-fwd accepts for $TRAEFIK_POD_IP:8000 and $TRAEFIK_POD_IP:8443"
+echo "Final traefik_wt0_dnat table:"
+nft list table inet traefik_wt0_dnat
+echo "Final netbird-rt-fwd chain:"
+nft -a list chain ip netbird netbird-rt-fwd
 echo "Reconciled ytdl NetBird exposure to Traefik pod IP: $TRAEFIK_POD_IP"
 EOF
 ```
@@ -207,6 +218,7 @@ sudo chmod 755 /usr/local/sbin/reconcile-ytdl-netbird.sh
 Run:
 
 ```bash
+sudo sed -n '1,240p' /usr/local/sbin/reconcile-ytdl-netbird.sh
 sudo /usr/local/sbin/reconcile-ytdl-netbird.sh
 sudo nft list table inet traefik_wt0_dnat
 sudo nft -a list chain ip netbird netbird-rt-fwd

@@ -91,11 +91,13 @@ What this intentionally removes:
 
 ### Apply and wait
 
-K3s should reconcile automatically after the file changes, but watch it:
+Because the current Traefik pod owns host `80/443`, do an explicit down/up instead of relying on a rolling replacement. Downtime is acceptable here, and this avoids any bind conflict or rollout weirdness while moving away from `hostNetwork`.
 
 ```bash
+kubectl -n kube-system scale deploy/traefik --replicas=0
+kubectl -n kube-system wait --for=delete pod -l app.kubernetes.io/name=traefik -n kube-system --timeout=180s
+kubectl -n kube-system scale deploy/traefik --replicas=1
 kubectl -n kube-system rollout status deploy/traefik --timeout=180s
-//// change to scale replical=0 then scale replica=1 method, downtime is okay. otherwise might be issues with port gin
 kubectl -n kube-system get pods -l app.kubernetes.io/name=traefik -o wide
 kubectl -n kube-system get svc traefik -o yaml
 ```

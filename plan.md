@@ -183,14 +183,14 @@ nft add rule inet traefik_wt0_dnat prerouting iifname "wt0" ip daddr "$WT0_IP" t
 nft add rule inet traefik_wt0_dnat postrouting oifname "cni0" ip daddr "$TRAEFIK_POD_IP" tcp dport 8000 counter masquerade
 nft add rule inet traefik_wt0_dnat postrouting oifname "cni0" ip daddr "$TRAEFIK_POD_IP" tcp dport 8443 counter masquerade
 
-# Reconcile NetBird-managed forward accept rules if missing.
-if ! nft list table ip netbird | grep -q "ip daddr $TRAEFIK_POD_IP tcp dport 8000"; then
-  nft add rule ip netbird netbird-rt-fwd ip daddr "$TRAEFIK_POD_IP" tcp dport 8000 counter accept
-fi
+# Remove stale old Traefik pod accepts from the NetBird-managed forward chain.
+for handle in $(nft -a list chain ip netbird netbird-rt-fwd | awk '/ip daddr 10\.42\..* tcp dport (8000|8443)/ {print $NF}'); do
+  nft delete rule ip netbird netbird-rt-fwd handle "$handle"
+done
 
-if ! nft list table ip netbird | grep -q "ip daddr $TRAEFIK_POD_IP tcp dport 8443"; then
-  nft add rule ip netbird netbird-rt-fwd ip daddr "$TRAEFIK_POD_IP" tcp dport 8443 counter accept
-fi
+# Add fresh accepts for the current Traefik pod IP.
+nft add rule ip netbird netbird-rt-fwd ip daddr "$TRAEFIK_POD_IP" tcp dport 8000 counter accept
+nft add rule ip netbird netbird-rt-fwd ip daddr "$TRAEFIK_POD_IP" tcp dport 8443 counter accept
 
 echo "Reconciled ytdl NetBird exposure to Traefik pod IP: $TRAEFIK_POD_IP"
 EOF
@@ -209,7 +209,7 @@ Run:
 ```bash
 sudo /usr/local/sbin/reconcile-ytdl-netbird.sh
 sudo nft list table inet traefik_wt0_dnat
-sudo nft -a list table ip netbird
+sudo nft -a list chain ip netbird netbird-rt-fwd
 ```
 
 Verify the current Traefik pod IP matches the rules:
@@ -217,6 +217,12 @@ Verify the current Traefik pod IP matches the rules:
 ```bash
 kubectl -n kube-system get pods -l app.kubernetes.io/name=traefik -o wide
 ```
+
+You want to see:
+
+- `traefik_wt0_dnat` points to the current Traefik pod IP
+- `netbird-rt-fwd` contains accepts for that same pod IP on `8000` and `8443`
+- stale rules for old Traefik pod IPs are gone
 
 ### 3.3 Create a systemd oneshot service
 

@@ -1,151 +1,189 @@
-# Traefik fallback debugging plan
+# Traefik next-round plan: DNAT `wt0` traffic to the Traefik service
 
-Goal: figure out why NetBird peer traffic to `ytdl.mink.lan:443` is still failing even though:
+Goal: replace the failed `wt0 -> NodePort` approach with a simpler host NAT rule that sends NetBird peer traffic for `ytdl.mink.lan` straight into the Traefik Kubernetes service path.
 
-- Traefik is a normal pod
-- the Traefik service is `NodePort`
-- local Pi tests to the NodePort work
-- `wt0` redirect rules exist
+## What we know now
 
-Current theory: the failure is happening at the Pi host edge, before traffic is successfully handed off to the NodePort path for real remote peer traffic.
+- Peer traffic to `100.90.167.160:443` reaches the Pi on `wt0`.
+- The nft redirect rule from `443 -> 32443` matches.
+- The kube-proxy NodePort rule for `32443` also matches.
+- Direct peer traffic to `100.90.167.160:32443` still hangs.
+- Conclusion: the NodePort path is not a good target for remote NetBird peer traffic here.
 
-## What to run on the Pi
+## New target design
 
-Open one terminal on the Pi for packet capture, and another for the static state commands.
+Use host nftables DNAT only for traffic arriving on `wt0`:
 
-### 1) Show redirect table and NodePort rules
+- `wt0 tcp/80 -> Traefik service ClusterIP:80`
+- `wt0 tcp/443 -> Traefik service ClusterIP:443`
 
-Run:
+This keeps Traefik as a normal Kubernetes workload and avoids:
+
+- `hostNetwork: true`
+- low-port bind capabilities
+- NodePort for the NetBird ingress path
+
+## Recommended approach
+
+DNAT to the Traefik service ClusterIP first, not directly to the pod IP.
+
+Why:
+
+- the service ClusterIP is the stable Kubernetes frontend
+- kube-proxy can still choose the backing endpoint
+- the rule does not need to change when the Traefik pod IP changes
+
+Only fall back to direct pod-IP DNAT if service-IP DNAT still fails.
+
+## 1) Capture current state before changing anything
+
+Run on the Pi:
 
 ```bash
+sudo kubectl -n kube-system get svc traefik -o wide
+sudo kubectl -n kube-system get endpoints traefik -o wide
+sudo kubectl -n kube-system get pods -l app.kubernetes.io/name=traefik -o wide
 sudo nft list table inet traefik_wt0_redirect
-sudo iptables-save | grep -E '32080|32443'
-sudo nft list ruleset | grep -E '32080|32443'
+sudo nft list ruleset | grep -E '100.90.167.160|32080|32443|10\.43\.'
 ```
 
 Paste output here:
 
 ```text
-den@pi:~$ sudo nft list table inet traefik_wt0_redirect
-table inet traefik_wt0_redirect {
-        chain prerouting {
-                type nat hook prerouting priority dstnat - 1; policy accept;
-                iifname "wt0" tcp dport 80 counter packets 0 bytes 0 redirect to :32080
-                iifname "wt0" tcp dport 443 counter packets 2 bytes 120 redirect to :32443
-        }
-}
-den@pi:~$ sudo iptables-save | grep -E '32080|32443'
--A KUBE-NODEPORTS -p tcp -m comment --comment "kube-system/traefik:web" -m tcp --dport 32080 -j KUBE-EXT-UQMCRMJZLI3FTLDP
--A KUBE-NODEPORTS -p tcp -m comment --comment "kube-system/traefik:websecure" -m tcp --dport 32443 -j KUBE-EXT-CVG3OEGEH7H5P3HQ
-den@pi:~$ sudo nft list ruleset | grep -E '32080|32443'
-# Warning: table ip6 nat is managed by iptables-nft, do not touch!
-# Warning: table ip nat is managed by iptables-nft, do not touch!
-# Warning: XT target MASQUERADE not found
-                ip protocol tcp  tcp dport 32080 counter packets 0 bytes 0 jump KUBE-EXT-UQMCRMJZLI3FTLDP
-                ip protocol tcp  tcp dport 32443 counter packets 2 bytes 120 jump KUBE-EXT-CVG3OEGEH7H5P3HQ
-# Warning: XT target DNAT not found
-# Warning: XT target DNAT not found
-# Warning: XT target DNAT not found
-# Warning: XT target DNAT not found
-# Warning: XT target MASQUERADE not found
-# Warning: XT target MASQUERADE not found
-# Warning: XT target MASQUERADE not found
-# Warning: XT target DNAT not found
-# Warning: XT target DNAT not found
-# Warning: XT target DNAT not found
-# Warning: XT target DNAT not found
-# Warning: XT target DNAT not found
-# Warning: XT target DNAT not found
-# Warning: XT target DNAT not found
-# Warning: XT target DNAT not found
-# Warning: XT target DNAT not found
-# Warning: XT target DNAT not found
-# Warning: table ip6 filter is managed by iptables-nft, do not touch!
-                iifname "wt0" tcp dport 80 counter packets 0 bytes 0 redirect to :32080
-                iifname "wt0" tcp dport 443 counter packets 2 bytes 120 redirect to :32443
-# Warning: table ip filter is managed by iptables-nft, do not touch!
 ```
 
-### 2) Watch incoming traffic on `wt0`
+## 2) Remove the old NodePort redirect rules
 
-Run this and leave it running while you test from another NetBird peer:
+Run on the Pi:
 
 ```bash
-sudo tcpdump -ni wt0 'tcp port 443 or tcp port 32443'
+sudo nft delete table inet traefik_wt0_redirect
 ```
 
-Paste output here after you run the peer-side tests below:
+If that table does not exist anymore, paste the error too.
+
+Paste output here:
 
 ```text
-den@pi:~$ sudo tcpdump -ni wt0 'tcp port 443 or tcp port 32443'
-tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
-listening on wt0, link-type RAW (Raw IP), snapshot length 262144 bytes
-11:17:20.783420 IP 100.90.149.44.37666 > 100.90.167.160.443: Flags [S], seq 3521301503, win 64480, options [mss 1240,sackOK,TS val 2066874797 ecr 0,nop,wscale 10], length 0
-11:17:20.783640 IP 100.90.167.160.443 > 100.90.149.44.37666: Flags [R.], seq 0, ack 3521301504, win 0, length 0
-11:17:24.282418 IP 100.90.149.44.43188 > 100.90.167.160.32443: Flags [S], seq 1585157304, win 64480, options [mss 1240,sackOK,TS val 2066878296 ecr 0,nop,wscale 10], length 0
-11:17:25.290112 IP 100.90.149.44.43188 > 100.90.167.160.32443: Flags [S], seq 1585157304, win 64480, options [mss 1240,sackOK,TS val 2066879304 ecr 0,nop,wscale 10], length 0
-11:17:26.314204 IP 100.90.149.44.43188 > 100.90.167.160.32443: Flags [S], seq 1585157304, win 64480, options [mss 1240,sackOK,TS val 2066880328 ecr 0,nop,wscale 10], length 0
-11:17:27.338160 IP 100.90.149.44.43188 > 100.90.167.160.32443: Flags [S], seq 1585157304, win 64480, options [mss 1240,sackOK,TS val 2066881352 ecr 0,nop,wscale 10], length 0
 ```
 
-### 3) Optional: watch any interface for the same ports
+## 3) Create the new `wt0` DNAT rules to the Traefik service ClusterIP
 
-If the `wt0` capture is inconclusive, also try:
+First get the current Traefik service ClusterIP:
 
 ```bash
-sudo tcpdump -ni any 'tcp port 443 or tcp port 32443'
+sudo kubectl -n kube-system get svc traefik -o jsonpath='{.spec.clusterIP}'
+```
+
+Then create the DNAT table and rules. Replace `10.43.85.149` below if the service IP is different.
+
+```bash
+sudo nft add table inet traefik_wt0_dnat
+sudo nft 'add chain inet traefik_wt0_dnat prerouting { type nat hook prerouting priority -101; policy accept; }'
+sudo nft add rule inet traefik_wt0_dnat prerouting iifname "wt0" ip daddr 100.90.167.160 tcp dport 80 counter dnat to 10.43.85.149:80
+sudo nft add rule inet traefik_wt0_dnat prerouting iifname "wt0" ip daddr 100.90.167.160 tcp dport 443 counter dnat to 10.43.85.149:443
+sudo nft list table inet traefik_wt0_dnat
 ```
 
 Paste output here:
 
 ```text
-(spam)
 ```
 
-## What to run from another NetBird peer
+## 4) Watch the traffic path while testing
 
-While the Pi `tcpdump` is running, execute these:
+Open one terminal on the Pi for packet capture.
+
+### Primary capture
+
+```bash
+sudo tcpdump -ni wt0 'host 100.90.149.44 and (tcp port 80 or tcp port 443)'
+```
+
+### Secondary capture
+
+In another terminal, also run:
+
+```bash
+sudo tcpdump -ni any 'host 100.90.149.44 and (tcp port 80 or tcp port 443)'
+```
+
+Optional if you want to see whether traffic reaches the in-cluster side:
+
+```bash
+sudo tcpdump -ni cni0 'tcp'
+```
+
+Paste output here:
+
+```text
+```
+
+## 5) Test from another NetBird peer
+
+Run from the peer while the Pi captures are running:
 
 ```bash
 curl -vkI https://ytdl.mink.lan/
-curl -vkI https://100.90.167.160:32443/ -H 'Host: ytdl.mink.lan'
+curl -vkI --resolve ytdl.mink.lan:443:100.90.167.160 https://ytdl.mink.lan/
+curl -vkI https://100.90.167.160/ -H 'Host: ytdl.mink.lan'
 ```
 
 Paste output here:
 
 ```text
-~ ❯ curl -vkI https://ytdl.mink.lan/        11:16:14
-
-* Host ytdl.mink.lan:443 was resolved.
-* IPv6: (none)
-* IPv4: 100.90.167.160
-*   Trying 100.90.167.160:443...
-* connect to 100.90.167.160 port 443 from 100.90.149.44 port 37666 failed: Connection refused
-* Failed to connect to ytdl.mink.lan port 443 after 1 ms: Could not connect to server
-* closing connection #0
-curl: (7) Failed to connect to ytdl.mink.lan port 443 after 1 ms: Could not connect to server
-~ ❯ curl -vkI https://100.90.167.160:32443/ -H 'Host: ytdl.mink.lan'
-
-*   Trying 100.90.167.160:32443...
-^C
 ```
 
-## What I will determine from the outputs
+## 6) Check nft counters after the peer tests
 
-These checks will tell us which of these is true:
+Run on the Pi:
 
-- peer traffic reaches `wt0:443` but never gets redirected
-- peer traffic is redirected to `32443` but the NodePort path still rejects it
-- peer traffic reaches `32443` and then fails later in kube-proxy/service routing
-- the issue is specific to `wt0` vs `any` interface handling
+```bash
+sudo nft list table inet traefik_wt0_dnat
+sudo iptables-save | grep -A20 -E 'KUBE-SERVICES|KUBE-SVC-|KUBE-EXT-'
+```
 
-## Decision rule after this round
+Paste output here:
 
-- If `443` packets appear on `wt0` but no `32443` packets appear, the redirect rule is not matching or not rewriting the way we expect.
-- If `32443` packets appear and the peer still gets `Connection refused`, the NodePort path itself is not usable for remote NetBird traffic.
-- If direct peer access to `100.90.167.160:32443` works but `443` does not, the redirect rule is the only remaining issue.
+```text
+```
 
-Once you paste the outputs, I can tell you whether to:
+## Decision rule
 
-1. change the nft redirect rule shape again, or
-2. stop targeting the NodePort and DNAT directly to the Traefik pod/service path instead
+- If the DNAT counters increase and the peer gets HTTP/TLS response, this design works.
+- If the DNAT counters increase but the peer still hangs, the service-IP path still is not completing; next fallback is DNAT directly to the current Traefik pod IP.
+- If the DNAT counters do not increase, the match is wrong; check `iifname`, destination IP, and nft hook priority.
+- If `https://100.90.167.160/ -H 'Host: ytdl.mink.lan'` works from the peer, DNS and Traefik routing are fine and the host NAT path is solved.
+
+## If service-IP DNAT fails: final fallback
+
+Use the current Traefik pod IP from:
+
+```bash
+sudo kubectl -n kube-system get pods -l app.kubernetes.io/name=traefik -o wide
+```
+
+Then replace the service-IP DNAT rules with pod-IP DNAT rules:
+
+```bash
+sudo nft flush chain inet traefik_wt0_dnat prerouting
+sudo nft add rule inet traefik_wt0_dnat prerouting iifname "wt0" ip daddr 100.90.167.160 tcp dport 80 counter dnat to <TRAEFIK_POD_IP>:80
+sudo nft add rule inet traefik_wt0_dnat prerouting iifname "wt0" ip daddr 100.90.167.160 tcp dport 443 counter dnat to <TRAEFIK_POD_IP>:443
+sudo nft list table inet traefik_wt0_dnat
+```
+
+Only use this if the service-IP version fails, because the pod IP is not stable.
+
+## Expected end state if this works
+
+- Traefik stays a normal pod
+- Traefik service can remain `ClusterIP`
+- NetBird peers reach `https://ytdl.mink.lan/` via `wt0`
+- no `hostNetwork: true`
+- no low-port capability workaround
+
+## Out of scope for this round
+
+- app PVC mount drift
+- non-networking manifest cleanup
+- broader Traefik chart cleanup beyond the access path needed for `ytdl.mink.lan`

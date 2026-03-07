@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { trpc } from "~/trpc/client";
-import { Calendar, Radio, RefreshCw, Clock } from "lucide-react";
+import { AlertTriangle, Calendar, Radio, RefreshCw, Clock } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import {
   Tooltip,
@@ -28,7 +28,7 @@ export default function FeedList() {
 
   // Create queries for all channels
   const queries = CHANNEL_IDS.map((channelId) =>
-    trpc.getYoutubeFeed.useQuery({ channelId })
+    trpc.getYoutubeFeed.useQuery({ channelId }),
   );
 
   // Format duration from seconds to HH:MM:SS or MM:SS
@@ -64,7 +64,7 @@ export default function FeedList() {
           ...query.data.items.map((item) => ({
             ...item,
             channelId,
-          }))
+          })),
         );
       }
     });
@@ -92,8 +92,13 @@ export default function FeedList() {
     <TooltipProvider>
       <div className="space-y-4">
         <div className="flex justify-between items-center mb-4">
-          <div className={`text-sm ${hasError ? "text-destructive" : "text-muted-foreground"}`}>
-            {loadedChannels}/{CHANNEL_IDS.length} channels
+          <div
+            className={`flex items-center gap-1.5 text-sm ${hasError ? "text-destructive" : "text-muted-foreground"}`}
+          >
+            <span>
+              {loadedChannels}/{CHANNEL_IDS.length} channels
+            </span>
+            {hasError && <AlertTriangle className="h-4 w-4 shrink-0" />}
           </div>
           <Button
             onClick={handleRefresh}

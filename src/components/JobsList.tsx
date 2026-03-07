@@ -131,19 +131,19 @@ export default function JobsList() {
                   </Badge>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate text-sm sm:text-base">
+                      <div className="w-full min-w-0 flex-1">
+                        <div className="font-medium text-sm sm:text-base break-words [overflow-wrap:anywhere]">
                           {job.data.title && job.data.uploader ? (
                             `${job.data.uploader}: ${job.data.title}`
                           ) : (
-                            <span className="text-muted-foreground">
+                            <span className="text-muted-foreground break-words [overflow-wrap:anywhere]">
                               {job.data.url}
                             </span>
                           )}
                         </div>
                       </div>
                     </TooltipTrigger>
-                    <TooltipContent>
+                    <TooltipContent className="max-w-[min(20rem,calc(100vw-2rem))] break-words [overflow-wrap:anywhere]">
                       <p>
                         {job.data.title && job.data.uploader
                           ? `${job.data.uploader}: ${job.data.title}`
@@ -196,7 +196,7 @@ export default function JobsList() {
                 </div>
                 {isFailed && isExpanded && (
                   <div className="px-3 pb-3">
-                    <pre className="bg-gray-100 dark:bg-gray-800 p-3 rounded text-xs font-mono overflow-x-auto whitespace-pre-wrap">
+                    <pre className="bg-gray-100 dark:bg-gray-800 p-3 rounded text-xs font-mono overflow-x-auto whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
                       {job.failedReason}
                     </pre>
                   </div>

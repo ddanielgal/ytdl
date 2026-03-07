@@ -164,7 +164,7 @@ set -euo pipefail
 WT0_IP="100.90.167.160"
 TRAEFIK_SELECTOR='app.kubernetes.io/name=traefik'
 
-TRAEFIK_POD_IP="$((kubectl -n kube-system get pods -l "$TRAEFIK_SELECTOR" -o jsonpath='{.items[0].status.podIP}') 2>/dev/null || true)"
+TRAEFIK_POD_IP="$(kubectl -n kube-system get pods -l "$TRAEFIK_SELECTOR" -o jsonpath='{range .items[*]}{.status.phase}{" "}{.status.podIP}{"\n"}{end}' 2>/dev/null | awk '$1=="Running"{print $2; exit}')"
 
 if [ -z "$TRAEFIK_POD_IP" ]; then
   echo "Could not determine Traefik pod IP" >&2

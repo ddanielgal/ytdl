@@ -2484,3 +2484,165 @@ My current best guess is:
 - and not **fully default K3s LoadBalancer Traefik with `svclb`**, unless the live inspection proves `svclb` can be made to handle `wt0` traffic correctly without further hacks
 
 That approach keeps the NetBird exposure narrow and explicit, avoids low-port binding tricks, and makes the data path easier to reason about.
+
+## Assessment after reviewing the Pi outputs
+
+### What is true right now
+
+- The current setup works end-to-end for NetBird peers.
+- `ytdl.mink.lan` resolves to the Pi's NetBird IP `100.90.167.160`.
+- Peer-to-Pi HTTPS succeeds and reaches the correct ingress/app.
+- The current Traefik deployment is **not** packaged-default anymore:
+  - `hostNetwork: true`
+  - `service.type: ClusterIP`
+  - Traefik process is listening directly on host `*:80` and `*:443`
+  - container has `NET_BIND_SERVICE`
+- `svclb-traefik-*` is gone.
+- K3s kube-proxy is also handling the Traefik service's `externalIPs` for `100.90.167.160`; the NAT counters prove packets to the NetBird IP are traversing kube-proxy rules.
+
+### My judgement
+
+- Your current workaround is valid, but it is more invasive than necessary.
+- The main thing making it "special" is not NetBird itself; it is that Traefik is running on the host network and binding low ports directly.
+- The evidence says the Pi can already accept `wt0` traffic cleanly, and kube-proxy can already match traffic destined to the NetBird IP.
+- Because of that, the alternative **NodePort + `wt0`-only redirect** design is viable on this host.
+- You should also be able to remove `net.ipv4.ip_unprivileged_port_start=0` once Traefik is no longer binding low ports directly.
+
+### One extra observation
+
+There is also evidence for a possible simpler fallback design than redirects:
+
+- keep Traefik off hostNetwork
+- keep or set `externalIPs: [100.90.167.160]` on the Traefik service
+- let kube-proxy DNAT directly from the NetBird IP to Traefik's pod/service backend
+
+I am not making that the primary recommendation because you explicitly asked for the redirect design, but the current kube-proxy counters show that `externalIPs` on the NetBird IP are already active and functioning.
+
+## Recommended next steps
+
+### Recommended target
+
+Move to:
+
+- packaged-style Traefik networking again
+- no `hostNetwork`
+- no direct host bind on `80/443`
+- no low-port sysctl dependency
+- fixed Traefik `NodePort`s
+- host NAT redirect on `wt0` only
+
+### Use these NodePorts
+
+Do **not** use `30080`, because `tuby` already uses it.
+
+Suggested Traefik NodePorts:
+
+- HTTP: `32080`
+- HTTPS: `32443`
+
+### Traefik config shape to move toward
+
+Replace the current `traefik-config.yaml` with something conceptually like this:
+
+```yaml
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    deployment:
+      replicas: 1
+    service:
+      type: NodePort
+      externalIPs:
+        - 100.90.167.160
+    ports:
+      web:
+        port: 8000
+        exposedPort: 80
+        nodePort: 32080
+      websecure:
+        port: 8443
+        exposedPort: 443
+        nodePort: 32443
+```
+
+Notes:
+
+- The important removals are `hostNetwork`, `dnsPolicy: ClusterFirstWithHostNet`, and the low-port bind/security overrides.
+- `port: 8000` and `port: 8443` are the normal non-privileged Traefik container ports.
+- I left `externalIPs` in place as a conservative compatibility measure because your current kube-proxy rules already use it successfully for the NetBird IP.
+
+### Redirect rules to add on the Pi
+
+Use `nftables`, since the host is already running nft-backed rules.
+
+Conceptual rules:
+
+```bash
+sudo nft add table inet traefik_wt0_redirect
+sudo nft 'add chain inet traefik_wt0_redirect prerouting { type nat hook prerouting priority dstnat; policy accept; }'
+sudo nft add rule inet traefik_wt0_redirect prerouting iifname "wt0" tcp dport 80 redirect to :32080
+sudo nft add rule inet traefik_wt0_redirect prerouting iifname "wt0" tcp dport 443 redirect to :32443
+```
+
+This keeps the redirect scope tight:
+
+- only packets entering on `wt0`
+- only TCP `80/443`
+- no effect on LAN traffic on `eth0`
+
+### Migration order
+
+Safest order:
+
+1. Change Traefik to `NodePort` with fixed NodePorts and remove `hostNetwork`.
+2. Wait for Traefik rollout and verify `kubectl -n kube-system get svc traefik` shows the new NodePorts.
+3. Before changing DNS or other access assumptions, add the `wt0` redirect rules.
+4. Test from another NetBird peer.
+5. If it works, remove the now-unneeded low-port sysctl override.
+
+### Validation commands after the change
+
+Run these after applying the new Traefik config and redirect rules:
+
+```bash
+kubectl -n kube-system get svc traefik -o wide
+kubectl -n kube-system get pods -o wide
+sudo ss -ltnp | grep -E ':80|:443|:32080|:32443'
+sudo nft list ruleset | sed -n '/traefik_wt0_redirect/,+20p'
+curl -vkI https://ytdl.mink.lan/
+```
+
+From another NetBird peer:
+
+```bash
+curl -vkI https://ytdl.mink.lan/
+openssl s_client -connect ytdl.mink.lan:443 -servername ytdl.mink.lan </dev/null
+```
+
+## A few caveats
+
+### DNS on the Pi itself
+
+- `getent hosts ytdl.mink.lan` works.
+- `resolvectl query ytdl.mink.lan` does not.
+
+That means host-side name resolution is a bit inconsistent, but application-level resolution is currently fine. I would treat this as a separate DNS hygiene issue, not a blocker for the Traefik migration.
+
+### App manifest drift
+
+- The live cluster clearly has repo drift already (`ytdl-config` PVC exists live, but not in the repo manifests you showed).
+- The app still appears not to mount the shared download PVC in `k8s/app.yml`.
+
+That is separate from ingress networking, but worth fixing once the network path is settled.
+
+## Bottom line
+
+- The current setup is working.
+- The redirect-based alternative is viable on this Pi.
+- I recommend migrating away from `hostNetwork` Traefik and low-port host binding.
+- Use fixed NodePorts `32080` and `32443`, then redirect only `wt0` traffic to those ports.
+- After that, revert `net.ipv4.ip_unprivileged_port_start` unless something else on the box still depends on it.

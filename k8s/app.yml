@@ -51,12 +51,17 @@ kind: Ingress
 metadata:
   name: ytdl
 spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - ytdl.mink.lan
+      secretName: ytdl-tls
   rules:
-    - host: pi.home
+    - host: ytdl.mink.lan
       http:
         paths:
           - pathType: Prefix
-            path: /ytdl
+            path: /
             backend:
               service:
                 name: ytdl

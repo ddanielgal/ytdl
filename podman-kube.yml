@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ytdl
+data:
+  YTDLP_PATH: "/usr/local/bin/yt-dlp"
+  YTDLP_COOKIES_PATH: "/etc/ytdl/cookies.txt"
+  REDIS_HOST: "localhost"
+  REDIS_PORT: "6379"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ytdl
+  labels:
+    app: ytdl
+spec:
+  containers:
+    - name: redis
+      image: docker.io/redis:7-alpine
+      ports:
+        - containerPort: 6379
+          hostPort: 6379
+
+    - name: app
+      image: localhost/ytdl:latest
+      ports:
+        - containerPort: 3000
+          hostPort: 3000
+      envFrom:
+        - configMapRef:
+            name: ytdl
+
+    - name: worker
+      image: localhost/ytdl:latest
+      command: ["bun", "run", "src/worker/worker.ts"]
+      envFrom:
+        - configMapRef:
+            name: ytdl
+      volumeMounts:
+        - name: data
+          mountPath: /app/data
+        - name: cookies
+          mountPath: /etc/ytdl/cookies.txt
+
+  volumes:
+    - name: data
+      hostPath:
+        path: ./data
+        type: DirectoryOrCreate
+    - name: cookies
+      hostPath:
+        path: ./cookies.txt
+        type: File

@@ -1,6 +1,5 @@
-import "dotenv/config";
 import { Worker, Job } from "bullmq";
-import YTDlpWrap from "yt-dlp-wrap-plus";
+const YTDlpWrap = require("yt-dlp-wrap-plus").default;
 import { z } from "zod";
 import env from "~/env";
 import { VideoJobData } from "~/lib/queue";
@@ -64,8 +63,6 @@ const worker = new Worker(
       "--ignore-errors",
       "--sleep-interval",
       "2",
-      "--js-runtimes",
-      "node",
       "--output",
       "data/videos/%(uploader)s/%(upload_date>%Y)s/%(upload_date)s %(title)s/%(title)s.%(ext)s",
       url,

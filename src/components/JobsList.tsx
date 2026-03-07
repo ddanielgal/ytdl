@@ -1,5 +1,3 @@
-"use client";
-
 import { trpc } from "~/trpc/client";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";

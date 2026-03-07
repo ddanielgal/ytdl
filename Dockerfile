@@ -1,43 +1,36 @@
 # syntax=docker/dockerfile:1
-# --- Stage 1: Dependencies ---
-FROM docker.io/library/node:20-slim AS deps
-WORKDIR /app
-COPY package.json package-lock.json ./
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci
+ARG TARGETPLATFORM
 
-# --- Stage 2: Build ---
-FROM docker.io/library/node:20-slim AS build
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-RUN npm run build
-RUN npm prune --omit=dev
+FROM --platform=$TARGETPLATFORM ghcr.io/astral-sh/uv:0.10 AS uvbin
 
-# --- Stage 3: Runtime ---
-FROM docker.io/library/node:20-slim AS runner
+FROM --platform=$TARGETPLATFORM docker.io/denoland/deno:bin-2.7.3 AS denobin
+
+# --- Stage 2: Runtime ---
+FROM --platform=$TARGETPLATFORM docker.io/oven/bun:1-slim AS runner
 WORKDIR /app
 
-# ffmpeg (system package -- no uv/pip alternative)
+COPY package.json bun.lock* bunfig.toml ./
+RUN bun install --frozen-lockfile --production
+
+COPY tsconfig.json server.ts ./
+COPY public ./public
+COPY src ./src
+
+# ffmpeg (system package)
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends ffmpeg
+    apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
-# uv + yt-dlp with curl-cffi (in a single isolated tool environment)
-COPY --from=ghcr.io/astral-sh/uv:0.10 /uv /usr/local/bin/uv
+# uv + yt-dlp with curl-cffi (yt-dlp[default] includes yt-dlp-ejs scripts)
+COPY --from=uvbin /uv /usr/local/bin/uv
 ENV UV_TOOL_BIN_DIR=/usr/local/bin
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv tool install 'yt-dlp[default,curl_cffi]'
 
-# App
-COPY --from=build /app/.next ./.next
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/package.json ./
-COPY --from=build /app/public ./public
-COPY --from=build /app/src ./src
-COPY --from=build /app/tsconfig.json ./
-COPY --from=build /app/next.config.mjs ./
+# Deno JS runtime for yt-dlp EJS challenge solving (enabled by default)
+COPY --from=denobin /deno /usr/local/bin/deno
 
 ENV NODE_ENV=production
 EXPOSE 3000
-CMD ["npm", "start"]
+CMD ["bun", "run", "server.ts"]

@@ -1,8 +1,5 @@
-"use client";
-
 import { ListVideo, X, Rss } from "lucide-react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { Link, useLocation } from "react-router-dom";
 import {
   Sidebar,
   SidebarContent,
@@ -17,7 +14,7 @@ import {
 import { Button } from "./ui/button";
 
 export function AppSidebar() {
-  const pathname = usePathname();
+  const { pathname } = useLocation();
   const { isMobile, setOpenMobile } = useSidebar();
 
   const handleLinkClick = () => {
@@ -48,7 +45,7 @@ export function AppSidebar() {
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={pathname === "/"}>
-                  <Link href="/" onClick={handleLinkClick}>
+                  <Link to="/" onClick={handleLinkClick}>
                     <Rss />
                     <span>Feeds</span>
                   </Link>
@@ -56,7 +53,7 @@ export function AppSidebar() {
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={pathname === "/queue"}>
-                  <Link href="/queue" onClick={handleLinkClick}>
+                  <Link to="/queue" onClick={handleLinkClick}>
                     <ListVideo />
                     <span>Queue</span>
                   </Link>

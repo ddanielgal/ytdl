@@ -1,5 +1,3 @@
-"use client";
-
 import { useMemo } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { trpc } from "~/trpc/client";
@@ -90,22 +88,11 @@ export default function FeedList() {
     });
   };
 
-  if (hasError) {
-    const firstError = queries.find((q) => q.error)?.error;
-    return (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-destructive">
-          Error loading feeds: {firstError?.message ?? "Unknown error"}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <TooltipProvider>
       <div className="space-y-4">
         <div className="flex justify-between items-center mb-4">
-          <div className="text-sm text-muted-foreground">
+          <div className={`text-sm ${hasError ? "text-destructive" : "text-muted-foreground"}`}>
             {loadedChannels}/{CHANNEL_IDS.length} channels
           </div>
           <Button

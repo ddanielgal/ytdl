@@ -6,12 +6,11 @@
 # testing
 /coverage
 
-# next.js
-/.next/
-/out/
+# production (build output)
+/dist
 
-# production
-/build
+# npm lockfile (project uses bun)
+package-lock.json
 
 # misc
 .DS_Store
@@ -31,8 +30,8 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
-next-env.d.ts
 
 data
 .env
 cookies.txt
+*.crt

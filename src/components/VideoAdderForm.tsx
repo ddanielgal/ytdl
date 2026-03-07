@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import { trpc } from "~/trpc/client";
 import { Input } from "~/components/ui/input";

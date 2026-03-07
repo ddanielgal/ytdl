@@ -22,6 +22,14 @@ sudo nft list table inet netbird_wt0
 Paste output here:
 
 ```text
+den@pi:~$ sudo nft list table inet netbird_wt0
+table inet netbird_wt0 {
+        chain input {
+                type filter hook input priority filter; policy accept;
+                iifname "wt0" counter packets 713 bytes 72590 accept
+                iifname "wt0" tcp dport { 80, 443 } accept
+        }
+}
 ```
 
 ## 2) Reset NetBird table counters
@@ -36,6 +44,15 @@ sudo nft list table inet netbird_wt0
 Paste output here:
 
 ```text
+den@pi:~$ sudo nft reset counters table inet netbird_wt0
+den@pi:~$ sudo nft list table inet netbird_wt0
+table inet netbird_wt0 {
+        chain input {
+                type filter hook input priority filter; policy accept;
+                iifname "wt0" counter packets 713 bytes 72590 accept
+                iifname "wt0" tcp dport { 80, 443 } accept
+        }
+}
 ```
 
 ## 3) Run exactly one peer request with current rules
@@ -49,6 +66,15 @@ curl -vkI --connect-timeout 2 --max-time 3 https://ytdl.mink.lan/
 Paste output here:
 
 ```text
+~/projects/ytdl bun ⇡17 ❯ curl -vkI --connect-timeout 2 --max-time 3 https://ytdl.mink.lan/      12:00:22
+
+* Host ytdl.mink.lan:443 was resolved.
+* IPv6: (none)
+* IPv4: 100.90.167.160
+*   Trying 100.90.167.160:443...
+* Connection timed out after 2002 milliseconds
+* closing connection #0
+curl: (28) Connection timed out after 2002 milliseconds
 ```
 
 ## 4) Inspect NetBird counters after the failed request
@@ -62,6 +88,13 @@ sudo nft list table inet netbird_wt0
 Paste output here:
 
 ```text
+table inet netbird_wt0 {
+        chain input {
+                type filter hook input priority filter; policy accept;
+                iifname "wt0" counter packets 713 bytes 72590 accept
+                iifname "wt0" tcp dport { 80, 443 } accept
+        }
+}
 ```
 
 ## 5) Temporary allow rule for the Traefik pod
@@ -79,6 +112,22 @@ sudo nft list table inet netbird_wt0
 Paste output here:
 
 ```text
+den@pi:~$ sudo nft insert rule inet netbird_wt0 netbird-rt-fwd ip daddr 10.42.0.59 tcp dport 8443 counter accept
+Error: Could not process rule: No such file or directory
+insert rule inet netbird_wt0 netbird-rt-fwd ip daddr 10.42.0.59 tcp dport 8443 counter accept
+                             ^^^^^^^^^^^^^^
+den@pi:~$ sudo nft insert rule inet netbird_wt0 netbird-rt-fwd ip daddr 10.42.0.59 tcp dport 8000 counter accept
+Error: Could not process rule: No such file or directory
+insert rule inet netbird_wt0 netbird-rt-fwd ip daddr 10.42.0.59 tcp dport 8000 counter accept
+                             ^^^^^^^^^^^^^^
+den@pi:~$ sudo nft list table inet netbird_wt0
+table inet netbird_wt0 {
+        chain input {
+                type filter hook input priority filter; policy accept;
+                iifname "wt0" counter packets 713 bytes 72590 accept
+                iifname "wt0" tcp dport { 80, 443 } accept
+        }
+}
 ```
 
 ## 6) Re-test from the peer after the temporary allow rule

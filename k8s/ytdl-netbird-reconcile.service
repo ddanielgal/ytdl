@@ -1,0 +1,13 @@
+[Unit]
+Description=Reconcile ytdl NetBird ingress rules
+After=network-online.target k3s.service netbird.service
+Wants=network-online.target
+Requires=k3s.service netbird.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/default/ytdl-netbird-reconcile
+ExecStart=/usr/local/sbin/reconcile-ytdl-netbird.sh
+
+[Install]
+WantedBy=multi-user.target

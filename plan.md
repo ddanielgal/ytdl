@@ -50,6 +50,79 @@ sudo nft list ruleset | grep -E '100.90.167.160|32080|32443|10\.43\.'
 Paste output here:
 
 ```text
+den@pi:~$ kubectl -n kube-system get svc traefik -o wide
+NAME      TYPE       CLUSTER-IP     EXTERNAL-IP   PORT(S)                      AGE    SELECTOR
+traefik   NodePort   10.43.85.149   <none>        80:32080/TCP,443:32443/TCP   488d   app.kubernetes.io/instance=traefik-kube-system,app.kubernetes.io/name=traefik
+den@pi:~$ kubectl -n kube-system get endpoints traefik -o wide
+NAME      ENDPOINTS                         AGE
+traefik   10.42.0.59:8000,10.42.0.59:8443   488d
+den@pi:~$ kubectl -n kube-system get pods -l app.kubernetes.io/name=traefik -o wide
+NAME                       READY   STATUS    RESTARTS   AGE   IP           NODE   NOMINATED NODE   READINESS GATES
+traefik-665d467bdf-vkw7t   1/1     Running   0          22m   10.42.0.59   pi     <none>           <none>
+den@pi:~$ sudo nft list table inet traefik_wt0_redirect
+table inet traefik_wt0_redirect {
+        chain prerouting {
+                type nat hook prerouting priority dstnat - 1; policy accept;
+                iifname "wt0" tcp dport 80 counter packets 0 bytes 0 redirect to :32080
+                iifname "wt0" tcp dport 443 counter packets 9 bytes 540 redirect to :32443
+        }
+}
+den@pi:~$ sudo nft list ruleset | grep -E '100.90.167.160|32080|32443|10\.43\.'
+# Warning: table ip6 nat is managed by iptables-nft, do not touch!
+# Warning: table ip nat is managed by iptables-nft, do not touch!
+                ip daddr 10.43.181.51 ip protocol udp  udp dport 1900 counter packets 0 bytes 0 jump KUBE-SVC-5TL63OHMAKD6HCC7
+                ip daddr 10.43.0.10 ip protocol tcp  tcp dport 9153 counter packets 0 bytes 0 jump KUBE-SVC-JD5MR3NA4I4DYORP
+                ip daddr 10.43.0.10 ip protocol udp  udp dport 53 counter packets 24 bytes 2132 jump KUBE-SVC-TCOU7JCQXEZGVUNU
+                ip daddr 10.43.11.157 ip protocol tcp  tcp dport 80 counter packets 0 bytes 0 jump KUBE-SVC-I7ZLXZTKXA3L3TZN
+                ip daddr 10.43.112.136 ip protocol tcp  tcp dport 80 counter packets 0 bytes 0 jump KUBE-SVC-OSA2NXMW2NNWNEVJ
+                ip daddr 10.43.0.10 ip protocol tcp  tcp dport 53 counter packets 0 bytes 0 jump KUBE-SVC-ERIFXISQEP7F7OF4
+                ip daddr 10.43.63.99 ip protocol tcp  tcp dport 80 counter packets 0 bytes 0 jump KUBE-SVC-WOUR72QKFKEYR5ZG
+                ip daddr 10.43.85.149 ip protocol tcp  tcp dport 80 counter packets 0 bytes 0 jump KUBE-SVC-UQMCRMJZLI3FTLDP
+                ip daddr 10.43.85.149 ip protocol tcp  tcp dport 443 counter packets 0 bytes 0 jump KUBE-SVC-CVG3OEGEH7H5P3HQ
+                ip daddr 10.43.111.105 ip protocol tcp  tcp dport 6379 counter packets 0 bytes 0 jump KUBE-SVC-OKJCEJEOAS2LLIDR
+                ip daddr 10.43.158.42 ip protocol tcp  tcp dport 80 counter packets 0 bytes 0 jump KUBE-SVC-R462G7DIGADMZDEZ
+                ip daddr 10.43.188.231 ip protocol tcp  tcp dport 5000 counter packets 0 bytes 0 jump KUBE-SVC-UHY5YTYXWYGJMWN5
+                ip daddr 10.43.0.1 ip protocol tcp  tcp dport 443 counter packets 0 bytes 0 jump KUBE-SVC-NPX46M4PTMTKRN6Y
+                ip daddr 10.43.151.224 ip protocol tcp  tcp dport 443 counter packets 0 bytes 0 jump KUBE-SVC-Z4ANX4WAEWEBLCTM
+# Warning: XT target MASQUERADE not found
+                ip protocol tcp  tcp dport 32080 counter packets 0 bytes 0 jump KUBE-EXT-UQMCRMJZLI3FTLDP
+                ip protocol tcp  tcp dport 32443 counter packets 6 bytes 360 jump KUBE-EXT-CVG3OEGEH7H5P3HQ
+                ip saddr != 10.42.0.0/16 ip daddr 10.43.0.10 ip protocol tcp  tcp dport 53 counter packets 0 bytes 0 jump KUBE-MARK-MASQ
+# Warning: XT target DNAT not found
+                ip saddr != 10.42.0.0/16 ip daddr 10.43.0.1 ip protocol tcp  tcp dport 443 counter packets 34 bytes 2040 jump KUBE-MARK-MASQ
+# Warning: XT target DNAT not found
+                ip saddr != 10.42.0.0/16 ip daddr 10.43.0.10 ip protocol tcp  tcp dport 9153 counter packets 0 bytes 0 jump KUBE-MARK-MASQ
+# Warning: XT target DNAT not found
+                ip saddr != 10.42.0.0/16 ip daddr 10.43.0.10 ip protocol udp  udp dport 53 counter packets 198 bytes 16046 jump KUBE-MARK-MASQ
+# Warning: XT target DNAT not found
+# Warning: XT target MASQUERADE not found
+# Warning: XT target MASQUERADE not found
+# Warning: XT target MASQUERADE not found
+# Warning: XT target DNAT not found
+                ip saddr != 10.42.0.0/16 ip daddr 10.43.151.224 ip protocol tcp  tcp dport 443 counter packets 0 bytes 0 jump KUBE-MARK-MASQ
+                ip saddr != 10.42.0.0/16 ip daddr 10.43.188.231 ip protocol tcp  tcp dport 5000 counter packets 0 bytes 0 jump KUBE-MARK-MASQ
+# Warning: XT target DNAT not found
+                ip saddr != 10.42.0.0/16 ip daddr 10.43.111.105 ip protocol tcp  tcp dport 6379 counter packets 0 bytes 0 jump KUBE-MARK-MASQ
+# Warning: XT target DNAT not found
+# Warning: XT target DNAT not found
+# Warning: XT target DNAT not found
+                ip saddr != 10.42.0.0/16 ip daddr 10.43.158.42 ip protocol tcp  tcp dport 80 counter packets 0 bytes 0 jump KUBE-MARK-MASQ
+                ip saddr != 10.42.0.0/16 ip daddr 10.43.181.51 ip protocol udp  udp dport 1900 counter packets 0 bytes 0 jump KUBE-MARK-MASQ
+                ip saddr != 10.42.0.0/16 ip daddr 10.43.11.157 ip protocol tcp  tcp dport 80 counter packets 0 bytes 0 jump KUBE-MARK-MASQ
+                ip saddr != 10.42.0.0/16 ip daddr 10.43.112.136 ip protocol tcp  tcp dport 80 counter packets 0 bytes 0 jump KUBE-MARK-MASQ
+# Warning: XT target DNAT not found
+# Warning: XT target DNAT not found
+# Warning: XT target DNAT not found
+# Warning: XT target DNAT not found
+# Warning: XT target DNAT not found
+# Warning: table ip6 filter is managed by iptables-nft, do not touch!
+                ip saddr != 10.42.0.0/16 ip daddr 10.43.63.99 ip protocol tcp  tcp dport 80 counter packets 0 bytes 0 jump KUBE-MARK-MASQ
+                ip saddr != 10.42.0.0/16 ip daddr 10.43.85.149 ip protocol tcp  tcp dport 80 counter packets 0 bytes 0 jump KUBE-MARK-MASQ
+                ip saddr != 10.42.0.0/16 ip daddr 10.43.85.149 ip protocol tcp  tcp dport 443 counter packets 0 bytes 0 jump KUBE-MARK-MASQ
+                iifname "wt0" tcp dport 80 counter packets 0 bytes 0 redirect to :32080
+                iifname "wt0" tcp dport 443 counter packets 9 bytes 540 redirect to :32443
+# Warning: table ip filter is managed by iptables-nft, do not touch!
+                ip daddr 10.43.0.0/16  counter packets 0 bytes 0 return
 ```
 
 ## 2) Remove the old NodePort redirect rules

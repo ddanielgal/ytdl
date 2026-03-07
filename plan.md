@@ -95,6 +95,7 @@ K3s should reconcile automatically after the file changes, but watch it:
 
 ```bash
 kubectl -n kube-system rollout status deploy/traefik --timeout=180s
+//// change to scale replical=0 then scale replica=1 method, downtime is okay. otherwise might be issues with port gin
 kubectl -n kube-system get pods -l app.kubernetes.io/name=traefik -o wide
 kubectl -n kube-system get svc traefik -o yaml
 ```

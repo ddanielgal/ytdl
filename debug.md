@@ -57,7 +57,7 @@ Paste output here after one peer-side test:
 From another NetBird peer, run exactly one request while both captures above are running:
 
 ```bash
-curl -vkI https://ytdl.mink.lan/
+curl -vkI --connect-timeout 2 --max-time 3 https://ytdl.mink.lan/
 ```
 
 Paste output here:
@@ -103,8 +103,8 @@ Paste output here:
 Run from the NetBird peer:
 
 ```bash
-curl -vkI https://ytdl.mink.lan/
-curl -vkI https://100.90.167.160/ -H 'Host: ytdl.mink.lan'
+curl -vkI --connect-timeout 2 --max-time 3 https://ytdl.mink.lan/
+curl -vkI --connect-timeout 2 --max-time 3 https://100.90.167.160/ -H 'Host: ytdl.mink.lan'
 ```
 
 Paste output here:

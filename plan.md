@@ -1,152 +1,406 @@
-# Final networking plan
+# Final networking playbook
 
-Goal: keep Traefik close to default K3s behavior and expose `ytdl.mink.lan` to NetBird peers using the smallest targeted host-side fix that is known to work.
-
-## Final design
-
-- Traefik runs as a normal Kubernetes pod.
-- Traefik service should be `ClusterIP`.
-- NetBird DNS keeps resolving `ytdl.mink.lan` to the Pi `wt0` IP `100.90.167.160`.
-- The Pi host handles `wt0` ingress with nftables DNAT and MASQUERADE.
-- NetBird forward filtering explicitly allows the forwarded flow to the Traefik pod.
+Goal: keep Traefik close to normal K3s behavior and expose `ytdl.mink.lan` to NetBird peers with the smallest proven Pi-side fix.
 
 Working traffic path:
 
-`NetBird peer -> wt0:80/443 -> host DNAT -> Traefik pod 8000/8443 -> host MASQUERADE on cni0 -> Traefik ingress -> ytdl service -> app pod`
+`NetBird peer -> Pi wt0:80/443 -> host DNAT -> Traefik pod:8000/8443 -> host MASQUERADE on cni0 -> Traefik ingress -> Service/ytdl -> app pod`
 
-## Why this is the chosen fix
+Why this is the chosen fix:
 
 - `externalIPs` did not work for real peer traffic.
 - `NodePort` plus `wt0` redirect did not work for real peer traffic.
-- `service ClusterIP` DNAT alone still failed because NetBird forward filtering blocked the forwarded packet.
-- direct pod DNAT plus NetBird forward allow plus MASQUERADE is confirmed working.
+- direct DNAT to the Traefik pod worked only after adding:
+  - a NetBird forward allow rule in `table ip netbird`
+  - a pod-bound `MASQUERADE` rule on the Pi
 
-## What to keep
+## Target end state
 
-- `Ingress/ytdl` and app service as-is
-- Traefik as a normal pod
-- TLS secret `ytdl-tls`
-- NetBird DNS custom zone
+- Traefik runs as a normal pod
+- Traefik service is `ClusterIP`
+- no `hostNetwork`
+- no low-port bind workaround
+- a Pi-local script reconciles the custom nftables and NetBird rules after boot/restart/pod-IP change
 
-## What to roll back
+## Part 1: Inspect and back up the current Pi state
 
-If any of these are still present in the live Pi config, remove them:
+Run on the Pi before changing anything:
 
-1. old NodePort redirect table
 ```bash
+sudo mkdir -p /root/ytdl-netbird-backup
+sudo cp /var/lib/rancher/k3s/server/manifests/traefik-config.yaml /root/ytdl-netbird-backup/traefik-config.yaml.bak.$(date +%F-%H%M%S)
+sudo nft list ruleset > /root/ytdl-netbird-backup/nft-ruleset.$(date +%F-%H%M%S).txt
+sudo iptables-save > /root/ytdl-netbird-backup/iptables-save.$(date +%F-%H%M%S).txt
+sudo kubectl -n kube-system get svc traefik -o yaml > /root/ytdl-netbird-backup/traefik-svc.$(date +%F-%H%M%S).yaml
+sudo kubectl -n kube-system get pods -l app.kubernetes.io/name=traefik -o wide > /root/ytdl-netbird-backup/traefik-pods.$(date +%F-%H%M%S).txt
+```
+
+Verify the current live Traefik and NetBird state:
+
+```bash
+sudo kubectl -n kube-system get svc traefik -o wide
+sudo kubectl -n kube-system get pods -l app.kubernetes.io/name=traefik -o wide
+sudo nft list table inet traefik_wt0_dnat
+sudo nft -a list table ip netbird
+```
+
+## Part 2: Roll back old experiments
+
+The objective here is to remove paths that are no longer needed.
+
+### 2.1 Remove the old NodePort redirect table
+
+If it still exists:
+
+```bash
+sudo nft list table inet traefik_wt0_redirect
 sudo nft delete table inet traefik_wt0_redirect
 ```
 
-2. debug-only nftrace rules in `traefik_wt0_dnat`
+If the delete says the table does not exist, that is fine.
 
-3. Traefik host-bound workaround settings from `/var/lib/rancher/k3s/server/manifests/traefik-config.yaml`
-   - `hostNetwork: true`
-   - `dnsPolicy: ClusterFirstWithHostNet`
-   - low-port bind capability additions used only for host port binding
+### 2.2 Remove debug-only nftrace rules from the working DNAT table
 
-4. failed service exposure experiments
-   - `externalIPs: [100.90.167.160]`
-   - Traefik `NodePort` exposure if it was added only for this debugging path
-
-Preferred Traefik end state:
-
-- normal pod networking
-- service type `ClusterIP`
-- no low-port host bind workaround
-
-## Live working rule shape
-
-The confirmed working live rules were:
+List the table with handles:
 
 ```bash
-sudo nft add table inet traefik_wt0_dnat
-sudo nft 'add chain inet traefik_wt0_dnat prerouting { type nat hook prerouting priority -101; policy accept; }'
-sudo nft 'add chain inet traefik_wt0_dnat postrouting { type nat hook postrouting priority srcnat; policy accept; }'
-
-sudo nft add rule inet traefik_wt0_dnat prerouting iifname "wt0" ip daddr 100.90.167.160 tcp dport 80 counter dnat to <TRAEFIK_POD_IP>:8000
-sudo nft add rule inet traefik_wt0_dnat prerouting iifname "wt0" ip daddr 100.90.167.160 tcp dport 443 counter dnat to <TRAEFIK_POD_IP>:8443
-
-sudo nft add rule inet traefik_wt0_dnat postrouting oifname "cni0" ip daddr <TRAEFIK_POD_IP> tcp dport 8000 counter masquerade
-sudo nft add rule inet traefik_wt0_dnat postrouting oifname "cni0" ip daddr <TRAEFIK_POD_IP> tcp dport 8443 counter masquerade
-
-sudo nft add rule ip netbird netbird-rt-fwd ip daddr <TRAEFIK_POD_IP> tcp dport 8000 counter accept
-sudo nft add rule ip netbird netbird-rt-fwd ip daddr <TRAEFIK_POD_IP> tcp dport 8443 counter accept
+sudo nft -a list table inet traefik_wt0_dnat
 ```
 
-## Important caveat
+If you see rules like:
 
-This working rule set depends on the current Traefik pod IP.
+- `meta nftrace set 1`
 
-- The pod IP can change when Traefik is recreated.
-- `table ip netbird` is managed by NetBird, so manually added rules there may disappear on restart or upgrade.
+delete them by handle, for example:
 
-Because of that, the right long-term solution is not manual nft commands. It is a small reconciliation script on the Pi.
+```bash
+sudo nft delete rule inet traefik_wt0_dnat prerouting handle <HANDLE>
+sudo nft delete rule inet traefik_wt0_dnat prerouting handle <HANDLE>
+```
 
-## Persistence plan on the Pi
+Then verify:
 
-### 1) Normalize Traefik first
+```bash
+sudo nft -a list table inet traefik_wt0_dnat
+```
 
-Make the live Traefik config as close to default as possible:
+### 2.3 Roll Traefik back toward defaults
 
-- remove `hostNetwork`
-- remove host-network DNS policy override
-- remove low-port bind capability workaround
-- keep Traefik service as `ClusterIP`
+Inspect the live override:
 
-### 2) Install a reconciliation script
+```bash
+sudo sed -n '1,220p' /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
+```
 
-Create a root-owned script on the Pi that:
+If it still contains host-bound workaround settings such as:
 
-1. gets the current Traefik pod IP
-2. recreates `table inet traefik_wt0_dnat`
-3. adds the DNAT rules for `wt0:80/443`
-4. adds the `cni0` masquerade rules for the pod IP
-5. ensures `table ip netbird` chain `netbird-rt-fwd` contains pod-port accepts for `8000` and `8443`
+- `hostNetwork: true`
+- `dnsPolicy: ClusterFirstWithHostNet`
+- added `NET_BIND_SERVICE`
+- pod security settings added only for low-port bind workaround
 
-### 3) Run it with systemd
+replace it with a minimal override that keeps Traefik on `ClusterIP` and otherwise close to packaged defaults:
 
-Use a oneshot service that runs after:
+```bash
+sudo tee /var/lib/rancher/k3s/server/manifests/traefik-config.yaml >/dev/null <<'EOF'
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    service:
+      type: ClusterIP
+EOF
+```
 
-- `k3s.service`
-- `netbird.service`
+Then wait for K3s to reconcile Traefik:
 
-Also re-run it:
+```bash
+sudo kubectl -n kube-system rollout status deploy/traefik --timeout=180s
+sudo kubectl -n kube-system get svc traefik -o wide
+sudo kubectl -n kube-system get pods -l app.kubernetes.io/name=traefik -o wide
+```
 
-- on boot
-- after NetBird restarts
-- after Traefik pod recreation, if needed
+What you want to see:
 
-### 4) Verify after each restart
+- Traefik is running as a normal pod with a `10.42.x.x` pod IP
+- Traefik service type is `ClusterIP`
+- there is no host listener requirement from Traefik itself
+
+### 2.4 Ignore NodePort unless it is still explicitly configured for Traefik
+
+If Traefik is still `NodePort`, inspect the live override and remove the NodePort-specific settings from `traefik-config.yaml`.
+
+Then re-check:
+
+```bash
+sudo kubectl -n kube-system get svc traefik -o wide
+```
+
+The target is:
+
+- `TYPE: ClusterIP`
+
+## Part 3: Install the durable host-side fix
+
+The live manual rules worked, but they are not durable because:
+
+- the Traefik pod IP can change
+- `table ip netbird` is managed by NetBird and may be regenerated
+
+So the durable fix is a small reconciliation script plus systemd.
+
+### 3.1 Create the reconciliation script
+
+Create `/usr/local/sbin/reconcile-ytdl-netbird.sh` on the Pi:
+
+```bash
+sudo tee /usr/local/sbin/reconcile-ytdl-netbird.sh >/dev/null <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+WT0_IP="100.90.167.160"
+TRAEFIK_SELECTOR='app.kubernetes.io/name=traefik'
+
+TRAEFIK_POD_IP="$((kubectl -n kube-system get pods -l "$TRAEFIK_SELECTOR" -o jsonpath='{.items[0].status.podIP}') 2>/dev/null || true)"
+
+if [ -z "$TRAEFIK_POD_IP" ]; then
+  echo "Could not determine Traefik pod IP" >&2
+  exit 1
+fi
+
+# Recreate our dedicated DNAT table from scratch.
+nft delete table inet traefik_wt0_dnat 2>/dev/null || true
+nft add table inet traefik_wt0_dnat
+nft 'add chain inet traefik_wt0_dnat prerouting { type nat hook prerouting priority -101; policy accept; }'
+nft 'add chain inet traefik_wt0_dnat postrouting { type nat hook postrouting priority srcnat; policy accept; }'
+
+nft add rule inet traefik_wt0_dnat prerouting iifname "wt0" ip daddr "$WT0_IP" tcp dport 80 counter dnat to "$TRAEFIK_POD_IP":8000
+nft add rule inet traefik_wt0_dnat prerouting iifname "wt0" ip daddr "$WT0_IP" tcp dport 443 counter dnat to "$TRAEFIK_POD_IP":8443
+
+nft add rule inet traefik_wt0_dnat postrouting oifname "cni0" ip daddr "$TRAEFIK_POD_IP" tcp dport 8000 counter masquerade
+nft add rule inet traefik_wt0_dnat postrouting oifname "cni0" ip daddr "$TRAEFIK_POD_IP" tcp dport 8443 counter masquerade
+
+# Reconcile NetBird-managed forward accept rules if missing.
+if ! nft list table ip netbird | grep -q "ip daddr $TRAEFIK_POD_IP tcp dport 8000"; then
+  nft add rule ip netbird netbird-rt-fwd ip daddr "$TRAEFIK_POD_IP" tcp dport 8000 counter accept
+fi
+
+if ! nft list table ip netbird | grep -q "ip daddr $TRAEFIK_POD_IP tcp dport 8443"; then
+  nft add rule ip netbird netbird-rt-fwd ip daddr "$TRAEFIK_POD_IP" tcp dport 8443 counter accept
+fi
+
+echo "Reconciled ytdl NetBird exposure to Traefik pod IP: $TRAEFIK_POD_IP"
+EOF
+```
+
+Make it executable:
+
+```bash
+sudo chmod 755 /usr/local/sbin/reconcile-ytdl-netbird.sh
+```
+
+### 3.2 Test the script manually
 
 Run:
+
+```bash
+sudo /usr/local/sbin/reconcile-ytdl-netbird.sh
+sudo nft list table inet traefik_wt0_dnat
+sudo nft -a list table ip netbird
+```
+
+Verify the current Traefik pod IP matches the rules:
+
+```bash
+kubectl -n kube-system get pods -l app.kubernetes.io/name=traefik -o wide
+```
+
+### 3.3 Create a systemd oneshot service
+
+Create `/etc/systemd/system/ytdl-netbird-reconcile.service`:
+
+```bash
+sudo tee /etc/systemd/system/ytdl-netbird-reconcile.service >/dev/null <<'EOF'
+[Unit]
+Description=Reconcile ytdl NetBird exposure rules
+After=network-online.target k3s.service netbird.service
+Wants=network-online.target
+Requires=k3s.service netbird.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/reconcile-ytdl-netbird.sh
+
+[Install]
+WantedBy=multi-user.target
+EOF
+```
+
+Reload systemd and enable it:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now ytdl-netbird-reconcile.service
+sudo systemctl status ytdl-netbird-reconcile.service --no-pager
+```
+
+### 3.4 Re-run the reconcile service after NetBird restart
+
+Because NetBird owns `table ip netbird`, it may recreate its rules and drop the manual accepts.
+
+The simplest safe operational rule is:
+
+- after any `netbird.service` restart, run the reconcile service again
+
+Manual command:
+
+```bash
+sudo systemctl restart netbird
+sudo systemctl start ytdl-netbird-reconcile.service
+```
+
+If you want this automated, add a NetBird drop-in that re-runs the reconcile service after NetBird starts.
+
+Create `/etc/systemd/system/netbird.service.d/override.conf`:
+
+```bash
+sudo mkdir -p /etc/systemd/system/netbird.service.d
+sudo tee /etc/systemd/system/netbird.service.d/override.conf >/dev/null <<'EOF'
+[Unit]
+Wants=ytdl-netbird-reconcile.service
+After=ytdl-netbird-reconcile.service
+
+[Service]
+ExecStartPost=/bin/systemctl start ytdl-netbird-reconcile.service
+EOF
+```
+
+Then reload systemd:
+
+```bash
+sudo systemctl daemon-reload
+```
+
+If you prefer less coupling, skip the drop-in and just re-run the reconcile service manually after NetBird changes.
+
+## Part 4: Verify from the Pi and from a peer
+
+### 4.1 Verify the live rule state on the Pi
 
 ```bash
 kubectl -n kube-system get pods -l app.kubernetes.io/name=traefik -o wide
 sudo nft list table inet traefik_wt0_dnat
 sudo nft -a list table ip netbird
-curl -vkI --connect-timeout 2 --max-time 3 https://ytdl.mink.lan/
 ```
 
-## Manual recovery procedure
+You want to see:
 
-If NetBird or Traefik restarts and access breaks, recover in this order:
+- DNAT rules to the current Traefik pod IP on ports `8000` and `8443`
+- MASQUERADE rules for the same pod IP on `cni0`
+- NetBird `netbird-rt-fwd` accepts for that same pod IP
 
-1. get the current Traefik pod IP
+### 4.2 Verify from another NetBird peer
+
+```bash
+curl -vkI --connect-timeout 2 --max-time 3 https://ytdl.mink.lan/
+curl -vkI --connect-timeout 2 --max-time 3 https://100.90.167.160/ -H 'Host: ytdl.mink.lan'
+```
+
+Expected result:
+
+- `https://ytdl.mink.lan/` returns `HTTP/2 200` and the `ytdl.mink.lan` certificate
+- `https://100.90.167.160/ -H 'Host: ytdl.mink.lan'` returns `HTTP/2 200` but will usually show the Traefik default certificate because SNI is the IP
+
+## Part 5: Manual recovery if it breaks later
+
+Use this after Traefik recreation, K3s restart, or NetBird restart.
+
+### 5.1 Check whether the Traefik pod IP changed
+
 ```bash
 kubectl -n kube-system get pods -l app.kubernetes.io/name=traefik -o wide
+sudo nft list table inet traefik_wt0_dnat
+sudo nft -a list table ip netbird
 ```
 
-2. rebuild the custom DNAT table with the new pod IP
+### 5.2 Re-run the reconcile script
 
-3. re-add the NetBird `netbird-rt-fwd` accept rules for the new pod IP
+```bash
+sudo /usr/local/sbin/reconcile-ytdl-netbird.sh
+```
 
-4. test from a peer
+or:
+
+```bash
+sudo systemctl start ytdl-netbird-reconcile.service
+```
+
+### 5.3 Re-test from a peer
+
 ```bash
 curl -vkI --connect-timeout 2 --max-time 3 https://ytdl.mink.lan/
 ```
 
-## Out of scope
+## Part 6: Roll back this whole custom host-side fix if needed
 
-- app PVC mount mismatch
-- broader manifest cleanup unrelated to NetBird ingress
-- replacing the self-signed cert workflow
+If you decide to abandon this design later:
+
+### 6.1 Disable the reconcile service
+
+```bash
+sudo systemctl disable --now ytdl-netbird-reconcile.service
+sudo rm -f /etc/systemd/system/ytdl-netbird-reconcile.service
+sudo systemctl daemon-reload
+```
+
+### 6.2 Remove the reconcile script
+
+```bash
+sudo rm -f /usr/local/sbin/reconcile-ytdl-netbird.sh
+```
+
+### 6.3 Remove the custom DNAT table
+
+```bash
+sudo nft delete table inet traefik_wt0_dnat
+```
+
+### 6.4 Remove the manually added NetBird forward rules
+
+List the table with handles:
+
+```bash
+sudo nft -a list table ip netbird
+```
+
+Delete only the manually added accepts for the Traefik pod by handle, for example:
+
+```bash
+sudo nft delete rule ip netbird netbird-rt-fwd handle <HANDLE_8000>
+sudo nft delete rule ip netbird netbird-rt-fwd handle <HANDLE_8443>
+```
+
+### 6.5 Remove any NetBird systemd drop-in if you created one
+
+```bash
+sudo rm -f /etc/systemd/system/netbird.service.d/override.conf
+sudo systemctl daemon-reload
+```
+
+### 6.6 Restore the previous Traefik override if needed
+
+Choose the correct backup from `/root/ytdl-netbird-backup/` and restore it, for example:
+
+```bash
+sudo cp /root/ytdl-netbird-backup/traefik-config.yaml.bak.<TIMESTAMP> /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
+sudo kubectl -n kube-system rollout status deploy/traefik --timeout=180s
+```
+
+## Notes
+
+- The custom fix is intentionally scoped only to `wt0` traffic.
+- LAN traffic on `eth0` is unaffected.
+- The app PVC mount mismatch is still out of scope for this networking playbook.

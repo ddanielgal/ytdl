@@ -156,6 +156,22 @@ sudo nft list table inet traefik_wt0_dnat
 Paste output here:
 
 ```text
+den@pi:~$ sudo nft list table inet traefik_wt0_dnat
+table inet traefik_wt0_dnat {
+        chain prerouting {
+                type nat hook prerouting priority dstnat - 1; policy accept;
+                iifname "wt0" ip daddr 100.90.167.160 tcp dport 80 counter packets 0 bytes 0 dnat ip to 10.42.0.59:8000
+                iifname "wt0" ip daddr 100.90.167.160 tcp dport 443 counter packets 25 bytes 1500 dnat ip to 10.42.0.59:8443
+                iifname "wt0" ip saddr 100.90.149.44 tcp dport 443 meta nftrace set 1
+                iifname "wt0" ip saddr 100.90.149.44 tcp dport 443 meta nftrace set 1
+        }
+
+        chain postrouting {
+                type nat hook postrouting priority srcnat; policy accept;
+                oifname "cni0" ip daddr 10.42.0.59 tcp dport 8000 counter packets 0 bytes 0 masquerade
+                oifname "cni0" ip daddr 10.42.0.59 tcp dport 8443 counter packets 0 bytes 0 masquerade
+        }
+}
 ```
 
 ## 6) Re-test after MASQUERADE
@@ -170,6 +186,21 @@ curl -vkI --connect-timeout 2 --max-time 3 https://100.90.167.160/ -H 'Host: ytd
 Paste output here:
 
 ```text
+~/projects/ytdl bun ⇡16 !1 ❯ curl -vkI --connect-timeout 2 --max-time 3 https://ytdl.mink.lan/   11:56:44
+
+* Host ytdl.mink.lan:443 was resolved.
+* IPv6: (none)
+* IPv4: 100.90.167.160
+*   Trying 100.90.167.160:443...
+* Connection timed out after 2002 milliseconds
+* closing connection #0
+curl: (28) Connection timed out after 2002 milliseconds
+~/projects/ytdl bun ⇡17 ❯ curl -vkI --connect-timeout 2 --max-time 3 https://100.90.167.160/ -H 'Host: ytdl.mink.lan'
+
+*   Trying 100.90.167.160:443...
+* Connection timed out after 2001 milliseconds
+* closing connection #0
+curl: (28) Connection timed out after 2001 milliseconds
 ```
 
 ## 7) Check final counters
@@ -183,6 +214,22 @@ sudo nft list table inet traefik_wt0_dnat
 Paste output here:
 
 ```text
+den@pi:~$ sudo nft list table inet traefik_wt0_dnat
+table inet traefik_wt0_dnat {
+        chain prerouting {
+                type nat hook prerouting priority dstnat - 1; policy accept;
+                iifname "wt0" ip daddr 100.90.167.160 tcp dport 80 counter packets 0 bytes 0 dnat ip to 10.42.0.59:8000
+                iifname "wt0" ip daddr 100.90.167.160 tcp dport 443 counter packets 29 bytes 1740 dnat ip to 10.42.0.59:8443
+                iifname "wt0" ip saddr 100.90.149.44 tcp dport 443 meta nftrace set 1
+                iifname "wt0" ip saddr 100.90.149.44 tcp dport 443 meta nftrace set 1
+        }
+
+        chain postrouting {
+                type nat hook postrouting priority srcnat; policy accept;
+                oifname "cni0" ip daddr 10.42.0.59 tcp dport 8000 counter packets 0 bytes 0 masquerade
+                oifname "cni0" ip daddr 10.42.0.59 tcp dport 8443 counter packets 0 bytes 0 masquerade
+        }
+}
 ```
 
 ## Decision rule

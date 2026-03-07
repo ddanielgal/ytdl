@@ -97,15 +97,17 @@ table inet netbird_wt0 {
 }
 ```
 
-## 5) Temporary allow rule for the Traefik pod
+## 5) Inspect the NetBird table with rule handles, then add temporary allow rules
 
-If the request still fails, insert temporary forward accept rules for the Traefik pod.
+The simple `netbird-rt-fwd` insert may fail if that chain does not exist in the current NetBird table. First inspect the exact chains and handles, then try `add rule` with the real chain name.
 
 Run on the Pi:
 
 ```bash
-sudo nft insert rule inet netbird_wt0 netbird-rt-fwd ip daddr 10.42.0.59 tcp dport 8443 counter accept
-sudo nft insert rule inet netbird_wt0 netbird-rt-fwd ip daddr 10.42.0.59 tcp dport 8000 counter accept
+sudo nft list table inet netbird_wt0
+sudo nft -a list table inet netbird_wt0
+sudo nft add rule inet netbird_wt0 netbird-rt-fwd ip daddr 10.42.0.59 tcp dport 8443 counter accept
+sudo nft add rule inet netbird_wt0 netbird-rt-fwd ip daddr 10.42.0.59 tcp dport 8000 counter accept
 sudo nft list table inet netbird_wt0
 ```
 

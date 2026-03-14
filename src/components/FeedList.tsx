@@ -125,9 +125,16 @@ export default function FeedList() {
                   <div className="flex-1 min-w-0">
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <h3 className="font-semibold text-lg mb-2 line-clamp-2 cursor-default">
-                          {item.title}
-                        </h3>
+                        <a
+                          href={item.videoUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block max-w-full hover:underline underline-offset-4"
+                        >
+                          <h3 className="font-semibold text-lg mb-2 line-clamp-2">
+                            {item.title}
+                          </h3>
+                        </a>
                       </TooltipTrigger>
                       <TooltipContent
                         className="max-w-[calc(100vw-2rem)] sm:max-w-md whitespace-normal break-words"

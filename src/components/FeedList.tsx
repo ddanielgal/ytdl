@@ -13,6 +13,7 @@ import FeedDownloadButton from "~/components/FeedDownloadButton";
 
 // Hardcoded channel IDs
 const CHANNEL_IDS = [
+  "UCswG6FSbgZjbWtdf_hMLaow", // Matt Pocock
   "UCsBjURrPoezykLs9EqgamOA", // Fireship
   "UCsXVk37bltHxD1rDPwtNM8Q", // Kurzgesagt
   "UCbRP3c757lWg9M-U7TyEkXA", // t3.gg

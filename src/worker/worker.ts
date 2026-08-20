@@ -30,6 +30,8 @@ const worker = new Worker(
       const rawMetadata = await yt.getVideoInfo([
         "--cookies",
         env.YTDLP_COOKIES_PATH,
+        "--extractor-args",
+        "youtube:player_client=default,web_embedded",
         url,
       ]);
       const metadata = z
@@ -54,6 +56,8 @@ const worker = new Worker(
     const downloadEmitter = yt.exec([
       "--cookies",
       env.YTDLP_COOKIES_PATH,
+      "--extractor-args",
+      "youtube:player_client=default,web_embedded",
       "-f",
       "bv*[height<=1080]+ba/b",
       "--write-info-json",
